@@ -319,7 +319,7 @@ F2B_EOF
 	equestion "Enable services in default runlevel? [Y/n]"
 	read -r REPLY
 	if [[ "${REPLY}" != "n" && "${REPLY}" != "N" ]]; then
-		for svc in suritop-stats suritop-suri suritop-waf suritop-iptables fail2ban; do
+		for svc in suritop-stats suritop-suri suritop-waf suritop-iptables iptables-manager fail2ban suricata; do
 			rc-update add ${svc} default 2>/dev/null
 		done
 		rc-update add iptables default 2>/dev/null
@@ -330,9 +330,13 @@ F2B_EOF
 	einfo ""
 	einfo "Configuration complete!"
 	einfo ""
-	einfo "Start services:"
+	einfo "Start all services:"
 	einfo "  rc-service suritop-iptables start"
 	einfo "  rc-service suritop-stats start"
+	einfo "  rc-service suritop-suri start"
+	einfo "  rc-service suritop-waf start"
+	einfo "  rc-service suricata start"
+	einfo "  rc-service iptables-manager start"
 	einfo "  rc-service nginx restart"
 	einfo "  rc-service fail2ban restart"
 	einfo ""

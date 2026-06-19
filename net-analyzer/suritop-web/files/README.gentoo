@@ -82,14 +82,21 @@ nano /etc/nginx/vhosts.d/nginx-vhost.conf
 
 ```bash
 rc-update add suritop-iptables default
+rc-update add iptables-manager default
 rc-update add suritop-stats default
 rc-update add suritop-suri default
 rc-update add suritop-waf default
+rc-update add fail2ban default
+rc-update add suricata default
+rc-update add iptables default
 
 rc-service suritop-iptables start
+rc-service iptables-manager start
 rc-service suritop-stats start
 rc-service suritop-suri start
 rc-service suritop-waf start
+rc-service fail2ban start
+rc-service suricata start
 ```
 
 ## File Locations
