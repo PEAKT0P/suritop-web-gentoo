@@ -215,18 +215,54 @@ print(f'admin:{r.stdout.strip()}')
 	equestion "Setup database (import schema + create users)? [Y/n]"
 	read -r REPLY
 	if [[ "${REPLY}" != "n" && "${REPLY}" != "N" ]]; then
-		if command -v mariadb >/dev/null 2>&1; then
-			mariadb -u root < "${EROOT}/usr/share/suritop-web/schema.sql" 2>/dev/null && \
-				einfo "Schema imported" || ewarn "Schema import failed (may already exist)"
-			mariadb -u root -e "
-				CREATE USER IF NOT EXISTS 'stats_reader'@'localhost' IDENTIFIED BY 'suritop_read_2026';
-				GRANT SELECT ON server_stats.* TO 'stats_reader'@'localhost';
-				CREATE USER IF NOT EXISTS 'stats_writer'@'localhost' IDENTIFIED BY 'suritop_write_2026';
-				GRANT INSERT,SELECT,DELETE ON server_stats.* TO 'stats_writer'@'localhost';
-				FLUSH PRIVILEGES;
-			" 2>/dev/null && einfo "DB users created" || ewarn "DB user creation failed"
+		# Ensure MariaDB is running
+		if ! rc-service mysql status >/dev/null 2>&1; then
+			einfo "Starting MariaDB..."
+			rc-service mysql start 2>/dev/null
+			sleep 2
+		fi
+
+		if command -v mariadb >/dev/null 2>&1 || command -v mysql >/dev/null 2>&1; then
+			DB_CMD=$(command -v mariadb 2>/dev/null || command -v mysql)
+
+			# Try root without password, then with common passwords
+			DB_OK=0
+			if ${DB_CMD} -u root -e "SELECT 1" >/dev/null 2>&1; then
+				DB_OK=1
+				DB_OPTS="-u root"
+			elif ${DB_CMD} -u root -p'' -e "SELECT 1" >/dev/null 2>&1; then
+				DB_OK=1
+				DB_OPTS="-u root"
+			fi
+
+			if [[ ${DB_OK} -eq 1 ]]; then
+				einfo "MariaDB connected"
+
+				# Import schema
+				if ${DB_CMD} ${DB_OPTS} < "${EROOT}/usr/share/suritop-web/schema.sql" 2>/dev/null; then
+					einfo "Schema imported"
+				else
+					ewarn "Schema import failed (tables may already exist)"
+				fi
+
+				# Create users
+				if ${DB_CMD} ${DB_OPTS} -e "
+					CREATE USER IF NOT EXISTS 'stats_reader'@'localhost' IDENTIFIED BY 'suritop_read_2026';
+					GRANT SELECT ON server_stats.* TO 'stats_reader'@'localhost';
+					CREATE USER IF NOT EXISTS 'stats_writer'@'localhost' IDENTIFIED BY 'suritop_write_2026';
+					GRANT INSERT,SELECT,DELETE ON server_stats.* TO 'stats_writer'@'localhost';
+					FLUSH PRIVILEGES;
+				" 2>/dev/null; then
+					einfo "DB users created (stats_reader / stats_writer)"
+				else
+					ewarn "DB user creation failed"
+				fi
+			else
+				ewarn "Cannot connect to MariaDB as root"
+				ewarn "Run manually: mariadb -u root -p < /usr/share/suritop-web/schema.sql"
+			fi
 		else
-			ewarn "mariadb not found — skip database setup"
+			ewarn "mariadb/mysql not found — skip database setup"
 		fi
 		einfo ""
 	fi
