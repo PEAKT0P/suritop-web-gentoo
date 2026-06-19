@@ -20,6 +20,11 @@ depend() {
 
 start_pre() {
     checkpath --file --owner root:root --mode 0644 /var/log/iptables-manager.log 2>/dev/null || true
+    # Kill stale iptables-manager from old init.d
+    if [ -f /run/suritop-web/iptables-manager.pid ]; then
+        kill $(cat /run/suritop-web/iptables-manager.pid) 2>/dev/null
+        rm -f /run/suritop-web/iptables-manager.pid
+    fi
 }
 
 stop_post() {

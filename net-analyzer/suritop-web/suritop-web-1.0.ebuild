@@ -81,6 +81,8 @@ src_install() {
 	insinto /var/www/suritop-web/htdocs
 	insopts -m0644
 	doins "${S}"/admin_stats.php
+	doins "${S}"/root-index.php index.php
+	doins "${S}"/root-config.php config.php
 
 	insinto /var/www/suritop-web/htdocs/attackmap
 	doins "${S}"/index.php
@@ -165,7 +167,6 @@ pkg_config() {
 	einfo "======================================"
 	einfo ""
 
-	# ── Detect network ──
 	DEFAULT_IF=$(ip -o route get 1.1.1.1 2>/dev/null | awk '{print $5}' | head -1)
 	DEFAULT_IF=${DEFAULT_IF:-eth0}
 	DEFAULT_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -179,7 +180,6 @@ pkg_config() {
 	einfo "  SSH Port:  ${DEFAULT_SSH}"
 	einfo ""
 
-	# ── Substitute @@placeholders@@ in config files ──
 	sed -i "s|@@SERVER_IP@@|${DEFAULT_IP}|g" "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
 	sed -i "s|@@NET_INTERFACE@@|${DEFAULT_IF}|g" "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
 	sed -i "s|@@SSH_PORT@@|${DEFAULT_SSH}|g" "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
@@ -189,8 +189,7 @@ pkg_config() {
 	sed -i "s|@@NET_INTERFACE@@|${DEFAULT_IF}|g" "${EROOT}/etc/suritop-web/suricata.yaml" 2>/dev/null
 	einfo "Config files templated with detected values"
 
-	# ── 1. Nginx + Basic Auth ──
-	equestion "Setup nginx with basic auth (admin:admin)? [Y/n]"
+	einfo "Setup nginx with basic auth (admin:admin)? [Y/n]"
 	read -r REPLY
 	if [[ "${REPLY}" != "n" && "${REPLY}" != "N" ]]; then
 		cp "${EROOT}/etc/suritop-web/nginx-vhost.conf" "${EROOT}/etc/nginx/vhosts.d/suritop-web.conf"
@@ -211,11 +210,9 @@ print(f'admin:{r.stdout.strip()}')
 		einfo ""
 	fi
 
-	# ── 2. Database ──
-	equestion "Setup database (import schema + create users)? [Y/n]"
+	einfo "Setup database (import schema + create users)? [Y/n]"
 	read -r REPLY
 	if [[ "${REPLY}" != "n" && "${REPLY}" != "N" ]]; then
-		# Ensure MariaDB is running
 		if ! rc-service mysql status >/dev/null 2>&1; then
 			einfo "Starting MariaDB..."
 			rc-service mysql start 2>/dev/null
@@ -225,7 +222,6 @@ print(f'admin:{r.stdout.strip()}')
 		if command -v mariadb >/dev/null 2>&1 || command -v mysql >/dev/null 2>&1; then
 			DB_CMD=$(command -v mariadb 2>/dev/null || command -v mysql)
 
-			# Try root without password, then with common passwords
 			DB_OK=0
 			if ${DB_CMD} -u root -e "SELECT 1" >/dev/null 2>&1; then
 				DB_OK=1
@@ -238,14 +234,12 @@ print(f'admin:{r.stdout.strip()}')
 			if [[ ${DB_OK} -eq 1 ]]; then
 				einfo "MariaDB connected"
 
-				# Import schema
 				if ${DB_CMD} ${DB_OPTS} < "${EROOT}/usr/share/suritop-web/schema.sql" 2>/dev/null; then
 					einfo "Schema imported"
 				else
 					ewarn "Schema import failed (tables may already exist)"
 				fi
 
-				# Create users
 				if ${DB_CMD} ${DB_OPTS} -e "
 					CREATE USER IF NOT EXISTS 'stats_reader'@'localhost' IDENTIFIED BY 'suritop_read_2026';
 					GRANT SELECT ON server_stats.* TO 'stats_reader'@'localhost';
@@ -267,9 +261,8 @@ print(f'admin:{r.stdout.strip()}')
 		einfo ""
 	fi
 
-	# ── 3. Suricata configs ──
 	if use suricata; then
-		equestion "Install suricata configs? [Y/n]"
+		einfo "Install suricata configs? [Y/n]"
 		read -r REPLY
 		if [[ "${REPLY}" != "n" && "${REPLY}" != "N" ]]; then
 			if [[ -d "${EROOT}/etc/suricata" ]]; then
@@ -283,8 +276,7 @@ print(f'admin:{r.stdout.strip()}')
 		einfo ""
 	fi
 
-	# ── 4. Fail2Ban ──
-	equestion "Setup fail2ban jails? [Y/n]"
+	einfo "Setup fail2ban jails? [Y/n]"
 	read -r REPLY
 	if [[ "${REPLY}" != "n" && "${REPLY}" != "N" ]]; then
 		cat > "${EROOT}/etc/fail2ban/jail.local" 2>/dev/null << F2B_EOF
@@ -323,9 +315,8 @@ F2B_EOF
 		einfo ""
 	fi
 
-	# ── 5. iptables ──
 	if use iptables; then
-		equestion "Enable iptables auto-setup on boot? [y/N]"
+		einfo "Enable iptables auto-setup on boot? [y/N]"
 		einfo "  WARNING: This will REPLACE your current iptables rules!"
 		einfo "  Choose N if you have custom firewall (NAT, Docker, port forwarding)"
 		read -r REPLY
@@ -340,9 +331,8 @@ F2B_EOF
 		einfo ""
 	fi
 
-	# ── 6. NAT / Docker ──
 	if use nat; then
-		equestion "Enable NAT masquerade? [y/N]"
+		einfo "Enable NAT masquerade? [y/N]"
 		read -r REPLY
 		if [[ "${REPLY}" == "y" || "${REPLY}" == "Y" ]]; then
 			sed -i 's|^SURITOP_NAT_ENABLE=.*|SURITOP_NAT_ENABLE="yes"|' "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
@@ -352,7 +342,7 @@ F2B_EOF
 	fi
 
 	if use docker; then
-		equestion "Enable Docker integration (DOCKER-USER chain)? [y/N]"
+		einfo "Enable Docker integration (DOCKER-USER chain)? [y/N]"
 		read -r REPLY
 		if [[ "${REPLY}" == "y" || "${REPLY}" == "Y" ]]; then
 			sed -i 's|^SURITOP_DOCKER_ENABLE=.*|SURITOP_DOCKER_ENABLE="yes"|' "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
@@ -361,8 +351,7 @@ F2B_EOF
 		einfo ""
 	fi
 
-	# ── 7. Enable services ──
-	equestion "Enable services in default runlevel? [Y/n]"
+	einfo "Enable services in default runlevel? [Y/n]"
 	read -r REPLY
 	if [[ "${REPLY}" != "n" && "${REPLY}" != "N" ]]; then
 		for svc in suritop-stats suritop-suri suritop-waf suritop-iptables iptables-manager fail2ban suricata; do
