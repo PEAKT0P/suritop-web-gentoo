@@ -33,7 +33,6 @@ METRICS_INTERVAL = 60
 BATCH_SIZE = 500
 
 NET_INTERFACE = 'enp6s0'
-NEXTCLOUD_LOG = '/media/nextcloud/nextcloud/nextcloud.log'
 
 MONITORED_FILES = {
     'messages': f'{LOG_DIR}/messages',
@@ -222,7 +221,6 @@ def process_nginx_access(lines, log_name):
                     logged_at
                 ))
 
-def process_nextcloud_log(lines):
     import json
     for line in lines:
         try:
@@ -528,12 +526,7 @@ def main():
         state_file = os.path.join(STATE_DIR, f'nginx_{log_name}.pos')
         nginx_tailers[log_name] = LogTailer(log_path, state_file)
 
-    nc_tailer = None
-    if os.path.exists(NEXTCLOUD_LOG):
-        nc_tailer = LogTailer(NEXTCLOUD_LOG, os.path.join(STATE_DIR, 'nextcloud.pos'))
-        logging.info(f"Monitoring Nextcloud log: {NEXTCLOUD_LOG}")
     else:
-        logging.info(f"Nextcloud log not found: {NEXTCLOUD_LOG}, skipping")
 
     conn = get_db()
     logging.info("Connected to MySQL")
@@ -560,10 +553,7 @@ def main():
                 if lines:
                     process_nginx_access(lines, log_name)
 
-            if nc_tailer:
-                lines = nc_tailer.read_new_lines()
                 if lines:
-                    process_nextcloud_log(lines)
 
             total_buf = len(ipt_buffer) + len(f2b_buffer) + len(nginx_buffer) + len(ssh_buffer) + len(nc_auth_buffer)
             if total_buf > 0:
