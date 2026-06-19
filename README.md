@@ -71,39 +71,25 @@ emerge -av --backtrack=30 net-analyzer/suritop-web
 emerge --config net-analyzer/suritop-web
 ```
 
-### 5. Запустить сервисы
+### 5. Запуск
+
+После `emerge --config` все сервисы уже запущены и добавлены в автозагрузку.
+
+Если нужно запустить вручную:
 
 ```bash
-# Базовые сервисы
 rc-service mysql start
 rc-service nginx start
 rc-service php-fpm start
-
-# Suritop компоненты
 rc-service suritop-stats start
 rc-service suritop-suri start
 rc-service suritop-waf start
 rc-service iptables-manager start
-
-# Защита
 rc-service suricata start
 rc-service fail2ban start
 ```
 
-### 6. Добавить в автозагрузку
-
-```bash
-rc-update add mysql default
-rc-update add nginx default
-rc-update add php-fpm default
-rc-update add suritop-stats default
-rc-update add suritop-suri default
-rc-update add suritop-waf default
-rc-update add iptables-manager default
-rc-update add suricata default
-rc-update add fail2ban default
-rc-update add iptables default
-```
+Автозагрузка уже настроена через `emerge --config` (вопрос в конце).
 
 ## USE Flags
 
@@ -117,22 +103,28 @@ rc-update add iptables default
 
 ## Конфигурация
 
-### /etc/conf.d/suritop-web
+При `emerge --config` все параметры определяются автоматически:
+- **IP сервера** — через `ip route`
+- **Интерфейс** — через `ip -o route get 1.1.1.1`
+- **SSH порт** — из `/etc/ssh/sshd_config`
+- **MariaDB** — запускается и настраивается автоматически
+- **Сервисы** — добавляются в автозагрузку
+
+### /etc/conf.d/suritop-web (пример)
 
 ```bash
 # Автоматическая настройка iptables при загрузке
 SURITOP_AUTO_IPTABLES="no"
 
-# Сеть
-SURITOP_SERVER_IP="172.23.230.169"
-SURITOP_NET_INTERFACE="enp6s0"
-SURITOP_SSH_PORT="61122"
+# Сеть (заполняется автоматически)
+SURITOP_SERVER_IP="192.168.1.100"        # авто: ip route
+SURITOP_NET_INTERFACE="enp3s0"           # авто: ip -o route
+SURITOP_SSH_PORT="22"                    # авто: sshd_config
 
-# Whitelist IP (никогда не блокировать)
-SURITOP_WHITELIST_IP="172.23.230.169 172.23.224.1"
+# Whitelist IP (добавьте ваш IP)
+SURITOP_WHITELIST_IP="192.168.1.100"
 
-# БД
-SURITOP_DB_NAME="server_stats"
+# БД (пароли для коллекторов)
 SURITOP_DB_USER_R="stats_reader"
 SURITOP_DB_PASS_R="suritop_read_2026"
 SURITOP_DB_USER_W="stats_writer"
