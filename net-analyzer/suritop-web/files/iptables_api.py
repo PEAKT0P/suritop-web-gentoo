@@ -21,6 +21,10 @@ import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import UnixStreamServer, StreamRequestHandler
 from datetime import datetime
+sys.path.insert(0, '/opt/stats_collector')
+from suritop_config import get_config
+_cfg = get_config()
+NET_IF = _cfg.get('net_interface', 'eth0')
 
 # ─── Конфигурация ───
 SOCKET_PATH = "/tmp/iptables-manager.sock"
@@ -492,7 +496,7 @@ def action_block_ip(ip):
     if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(/\d{1,2})?$", ip):
         return {"error": "Invalid IP format"}
 
-    result = run_cmd(ff"iptables -I INPUT 1 -s {ip} -i {NET_IF} -j DROP")
+    result = run_cmd(f"iptables -I INPUT 1 -s {ip} -i {NET_IF} -j DROP")
     log(f"ACTION: block_ip {ip} -> {result}")
     return {"ok": True, "action": "block_ip", "ip": ip}
 
@@ -502,7 +506,7 @@ def action_unblock_ip(ip):
     if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(/\d{1,2})?$", ip):
         return {"error": "Invalid IP format"}
 
-    result = run_cmd(ff"iptables -D INPUT -s {ip} -i {NET_IF} -j DROP")
+    result = run_cmd(f"iptables -D INPUT -s {ip} -i {NET_IF} -j DROP")
     log(f"ACTION: unblock_ip {ip} -> {result}")
     return {"ok": True, "action": "unblock_ip", "ip": ip}
 
@@ -525,7 +529,7 @@ def action_open_port(port, proto="tcp"):
 
     # Вставляем перед правилами DROP в конце
     result = run_cmd(
-        ff"iptables -I INPUT 5 -i {NET_IF} -p {proto} --dport {port} -j ACCEPT"
+        f"iptables -I INPUT 5 -i {NET_IF} -p {proto} --dport {port} -j ACCEPT"
     )
     log(f"ACTION: open_port {port}/{proto} -> {result}")
     return {"ok": True, "action": "open_port", "port": port, "proto": proto}
@@ -542,7 +546,7 @@ def action_close_port(port, proto="tcp"):
         return {"error": "Invalid protocol"}
 
     result = run_cmd(
-        ff"iptables -D INPUT -i {NET_IF} -p {proto} --dport {port} -j ACCEPT"
+        f"iptables -D INPUT -i {NET_IF} -p {proto} --dport {port} -j ACCEPT"
     )
     log(f"ACTION: close_port {port}/{proto} -> {result}")
     return {"ok": True, "action": "close_port", "port": port, "proto": proto}

@@ -67,7 +67,7 @@ def get_config():
         'our_ip': os.environ.get('SURITOP_SERVER_IP',
                   conf.get('Network', 'our_ip', fallback='127.0.0.1')),
         'net_interface': os.environ.get('SURITOP_NET_INTERFACE',
-                         conf.get('Interfaces', 'monitor', fallback='enp6s0')),
+                         conf.get('Interfaces', 'monitor', fallback='eth0')),
     }
     return _config
 

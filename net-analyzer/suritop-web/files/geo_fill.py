@@ -10,6 +10,8 @@ geo_fill.py v2.1 — Заполняет таблицу geo_cache (Gentoo Edition
 Никаких pip-модулей. Никаких долгих зависаний при 429 ошибке.
 """
 
+sys.path.insert(0, '/opt/stats_collector')
+from suritop_config import get_db, get_config
 import sys
 import time
 import json
@@ -19,10 +21,11 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError
 
 # ── Конфигурация БД ──
-DB_HOST = 'localhost'
-DB_NAME = 'server_stats'
-DB_USER = 'stats_writer'
-DB_PASS = 'St4ts_Wr1t3r_2026!'
+_cfg = get_config()
+DB_HOST = _cfg["db_host"]
+DB_NAME = _cfg["db_name"]
+DB_USER = _cfg["db_user_w"]
+DB_PASS = _cfg["db_pass_w"]
 
 BATCH_API_URL = 'http://ip-api.com/batch'
 BATCH_SIZE = 100

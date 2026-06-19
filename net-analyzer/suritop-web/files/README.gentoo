@@ -1,126 +1,184 @@
 # suritop-web — Security Monitoring System for Gentoo Linux
 
-## Description
+## Описание
 
-suritop-web combines Suricata IDS, ModSecurity WAF, Fail2Ban, and iptables
-into a unified web dashboard with real-time attack map and monitoring.
+suritop-web — система мониторинга безопасности для Gentoo Linux:
+- **Suricata IDS/IPS** — обнаружение вторжений
+- **ModSecurity WAF** — защита веб-приложений
+- **Fail2Ban** — блокировка атак
+- **iptables** — файрвол с веб-управлением
+- **Attack Map** — карта атак в реальном времени
+- **Admin Stats** — статистика и мониторинг
 
-## Components
+## Быстрая установка на чистый Gentoo + OpenRC
 
-- **Attack Map** — Real-time Leaflet.js map of attacks
-- **Admin Stats** — Detailed attack statistics and IP management
-- **Firewall Manager** — Web-based iptables management
-- **Suritop TUI** — Terminal (curses) IDS+WAF monitor
-- **Collectors** — Python daemons for log collection
-
-## Quick Start
-
-### 1. Configure
-
-Edit `/etc/conf.d/suritop-web` with your settings:
-- Database passwords
-- Server IP
-- Network interface
-- SSH port
-
-### 2. Database Setup
+### 1. Установить зависимости
 
 ```bash
-# Import schema
-mysql -u root -p < /usr/share/suritop-web/schema.sql
-
-# Create database users
-mysql -u root -p -e "
-  CREATE USER IF NOT EXISTS 'stats_reader'@'localhost' IDENTIFIED BY 'YOUR_PASSWORD';
-  GRANT SELECT ON server_stats.* TO 'stats_reader'@'localhost';
-  CREATE USER IF NOT EXISTS 'stats_writer'@'localhost' IDENTIFIED BY 'YOUR_PASSWORD';
-  GRANT INSERT,SELECT,DELETE ON server_stats.* TO 'stats_writer'@'localhost';
-  FLUSH PRIVILEGES;
-"
+emerge --sync
+emerge -av app-admin/sudo
 ```
 
-### 3. Suricata Setup (Optional)
+### 2. Установить overlay
 
 ```bash
-# Copy configs to Suricata
-cp /etc/suritop-web/suricata.yaml /etc/suricata/
-cp /etc/suritop-web/classification.config /etc/suricata/
-cp /etc/suritop-web/reference.config /etc/suricata/
-cp /etc/suritop-web/threshold.config /etc/suricata/
-cp /etc/suritop-web/rules/local.rules /etc/suricata/rules/
+# Скопировать архив на сервер
+scp suritop-web-overlay.tar.gz root@server:/tmp/
 
-# Edit suricata.yaml to match your network
-nano /etc/suricata/suricata.yaml
+# На сервере:
+cd /tmp
+tar xzf suritop-web-overlay.tar.gz
+
+# Зарегистрировать overlay
+mkdir -p /etc/portage/repos.conf
+cat > /etc/portage/repos.conf/suritop-web.conf << 'EOF'
+[suritop-web]
+location = /usr/local/portage/local
+masters = gentoo
+auto-sync = false
+priority = 50
+EOF
+
+# Скопировать overlay
+mkdir -p /usr/local/portage/local
+cp -r suritop-web-overlay/* /usr/local/portage/local/
 ```
 
-### 4. Activate DROP Rules (OPTIONAL)
-
-**WARNING**: DROP rules will actively block traffic!
+### 3. Настроить USE flags
 
 ```bash
-# Review the drop rules first
-cat /etc/suritop-web/drop.conf
+# Принять ключи для пакетов
+mkdir -p /etc/portage/package.accept_keywords
+cat > /etc/portage/package.accept_keywords/suritop-web << 'EOF'
+net-analyzer/suritop-web **
+net-analyzer/suricata **
+net-libs/libhtp **
+EOF
 
-# When ready, copy to Suricata
-cp /etc/suritop-web/drop.conf /etc/suricata/
-
-# Edit suricata.yaml to enable drop:
-# detect:
-#   drop:
-#     enabled: yes
+# Настроить USE flags
+cat > /etc/portage/package.use/suritop-web << 'EOF'
+net-analyzer/suritop-web -iptables -nat -docker +suricata
+EOF
 ```
 
-### 5. Nginx Setup
+### 4. Установить пакет
 
 ```bash
-cp /etc/suritop-web/nginx-vhost.conf /etc/nginx/vhosts.d/
-# Edit server_name, SSL paths, and auth settings
-nano /etc/nginx/vhosts.d/nginx-vhost.conf
+# Сначала установить зависимости
+emerge -av --backtrack=30 net-analyzer/suritop-web
+
+# Интерактивная настройка (nginx, БД, fail2ban, iptables)
+emerge --config net-analyzer/suritop-web
 ```
 
-### 6. Enable Services
+### 5. Запуск
+
+После `emerge --config` все сервисы уже запущены и добавлены в автозагрузку.
+
+Если нужно запустить вручную:
 
 ```bash
-rc-update add suritop-iptables default
-rc-update add iptables-manager default
-rc-update add suritop-stats default
-rc-update add suritop-suri default
-rc-update add suritop-waf default
-rc-update add fail2ban default
-rc-update add suricata default
-rc-update add iptables default
-
-rc-service suritop-iptables start
-rc-service iptables-manager start
+rc-service mysql start
+rc-service nginx start
+rc-service php-fpm start
 rc-service suritop-stats start
 rc-service suritop-suri start
 rc-service suritop-waf start
-rc-service fail2ban start
+rc-service iptables-manager start
 rc-service suricata start
+rc-service fail2ban start
 ```
 
-## File Locations
+Автозагрузка уже настроена через `emerge --config` (вопрос в конце).
 
-| Path | Description |
-|------|-------------|
-| `/etc/conf.d/suritop-web` | Main configuration |
-| `/etc/suritop-web/` | Suricata config templates |
-| `/opt/stats_collector/` | Python collectors |
-| `/opt/iptables-manager/` | iptables API daemon |
-| `/var/www/suritop-web/htdocs/` | PHP web files |
-| `/var/lib/stats_collector/` | State files |
-| `/usr/share/suritop-web/schema.sql` | Database schema |
+## USE Flags
 
-## TUI Monitor
+| Flag | По умолчанию | Описание |
+|------|-------------|----------|
+| `+iptables` | вкл | Автогенерация iptables правил |
+| `-nat` | выкл | NAT masquerade (для раздачи интернета) |
+| `-docker` | выкл | Интеграция с Docker (DOCKER-USER chain) |
+| `+suricata` | вкл | IPS правила Suricata |
+| `-geoip` | выкл | GeoIP определение |
 
-Run the terminal monitor:
+## Конфигурация
+
+При `emerge --config` все параметры определяются автоматически:
+- **IP сервера** — через `ip route`
+- **Интерфейс** — через `ip -o route get 1.1.1.1`
+- **SSH порт** — из `/etc/ssh/sshd_config`
+- **MariaDB** — запускается и настраивается автоматически
+- **Сервисы** — добавляются в автозагрузку
+
+### /etc/conf.d/suritop-web (пример)
+
 ```bash
-su - stats_collector -c "python3 /opt/stats_collector/suritop.py"
+# Автоматическая настройка iptables при загрузке
+SURITOP_AUTO_IPTABLES="no"
+
+# Сеть (заполняется автоматически)
+SURITOP_SERVER_IP="192.168.1.100"        # авто: ip route
+SURITOP_NET_INTERFACE="enp3s0"           # авто: ip -o route
+SURITOP_SSH_PORT="22"                    # авто: sshd_config
+
+# Whitelist IP (добавьте ваш IP)
+SURITOP_WHITELIST_IP="192.168.1.100"
+
+# БД (пароли для коллекторов)
+SURITOP_DB_USER_R="stats_reader"
+SURITOP_DB_PASS_R="suritop_read_2026"
+SURITOP_DB_USER_W="stats_writer"
+SURITOP_DB_PASS_W="suritop_write_2026"
+
+# NAT (для раздачи интернета)
+SURITOP_NAT_ENABLE="no"
+
+# Docker
+SURITOP_DOCKER_ENABLE="no"
 ```
 
-## Troubleshooting
+## Структура файлов
 
-- Check logs: `/var/log/stats_collector.log`, `/var/log/suricata_collector.log`
-- Verify MySQL connection: `mysql -u stats_writer -p -e "SELECT 1"`
-- Check Suricata: `rc-service suricata status`
-- Check collectors: `ps aux | grep stats_collector`
+```
+/etc/conf.d/suritop-web          — Конфигурация
+/etc/suritop-web/                — Конфиги suricata
+/etc/nginx/vhosts.d/suritop-web.conf — Nginx vhost
+/opt/stats_collector/            — Python коллекторы
+/opt/iptables-manager/           — iptables API daemon
+/var/www/suritop-web/htdocs/     — PHP файлы сайта
+/usr/share/suritop-web/schema.sql — Схема БД
+/etc/init.d/suritop-*            — Init scripts
+```
+
+## Доступ
+
+- **URL:** http://server-ip/
+- **Логин:** admin
+- **Пароль:** admin
+
+## Сервисы
+
+| Сервис | Команда | Описание |
+|--------|---------|----------|
+| mysql | `rc-service mysql start` | MariaDB база данных |
+| nginx | `rc-service nginx start` | Веб-сервер |
+| php-fpm | `rc-service php-fpm start` | PHP процессор |
+| suritop-stats | `rc-service suritop-stats start` | Сбор метрик системы |
+| suritop-suri | `rc-service suritop-suri start` | Коллектор suricata (Attack Map) |
+| suritop-waf | `rc-service suritop-waf start` | Коллектор modsecurity |
+| iptables-manager | `rc-service iptables-manager start` | API управления файрволом |
+| suricata | `rc-service suricata start` | IDS/IPS движок |
+| fail2ban | `rc-service fail2ban start` | Блокировкаатак |
+| iptables | `rc-service iptables start` | Файрвол |
+
+## Удаление
+
+```bash
+emerge -C net-analyzer/suritop-web
+rm -rf /etc/suritop-web
+rm -rf /var/www/suritop-web
+rm -rf /opt/stats_collector
+rm -rf /opt/iptables-manager
+rm -rf /etc/portage/repos.conf/suritop-web.conf
+rm -rf /usr/local/portage/local
+```

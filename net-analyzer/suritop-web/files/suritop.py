@@ -10,6 +10,8 @@ Keys:   q/Esc=quit  p=pause  c=clear  f=filter  d=detail
 """
 
 import curses
+sys.path.insert(0, '/opt/stats_collector')
+from suritop_config import get_config
 import json
 import os
 import time
@@ -21,7 +23,7 @@ from datetime import datetime, timedelta
 config = configparser.ConfigParser()
 config.read('/opt/stats_collector/collector.conf')
 # Берем IP, а если файла нет или там ошибка — используем старый IP как запасной
-OUR_IP = config.get('Network', 'our_ip', fallback='37.204.57.87')
+OUR_IP = config.get('Network', 'our_ip', fallback='127.0.0.1')
 
 EVE_LOG = '/var/log/suricata/eve.json'
 MAX_ALERTS = 500
@@ -59,13 +61,16 @@ def _get_local_ips():
     except ImportError:
         pass
     # Добавляем стандартные приватные подсети шлюзов
-    ips.update({'192.168.1.1', '10.0.0.1', '172.16.0.1'})
+    ips.update({'10.0.0.1', '172.16.0.1', '192.168.0.1'})
     return ips
 
 LOCAL_IPS = _get_local_ips()
 
-DB_HOST='localhost'; DB_USER='stats_writer'
-DB_PASS='St4ts_Wr1t3r_2026!'; DB_NAME='server_stats'
+_db_cfg = get_config()
+DB_HOST = _db_cfg["db_host"]
+DB_USER = _db_cfg["db_user_w"]
+DB_PASS = _db_cfg["db_pass_w"]
+DB_NAME = _db_cfg["db_name"]
 
 try:
     import MySQLdb; HAS_MYSQL=True

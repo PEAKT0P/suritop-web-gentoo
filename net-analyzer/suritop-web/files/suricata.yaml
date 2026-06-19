@@ -617,7 +617,7 @@ logging:
 
 # Linux high speed capture support
 af-packet:
-  - interface: enp6s0
+  - interface: @@NET_INTERFACE@@
     cluster-id: 99
     cluster-type: cluster_flow
     tpacket-v3: yes
@@ -838,7 +838,7 @@ dpdk:
 
 # Cross platform libpcap capture support
 pcap:
-  - interface: eth0
+  - interface: @@NET_INTERFACE@@
     # On Linux, pcap will try to use mmap'ed capture and will use "buffer-size"
     # as total memory used by the ring. So set this to something bigger
     # than 1% of your bandwidth.
@@ -2021,7 +2021,7 @@ netmap:
 # PF_RING configuration: for use with native PF_RING support
 # for more info see http://www.ntop.org/products/pf_ring/
 pfring:
-  - interface: eth0
+  - interface: @@NET_INTERFACE@@
     # Number of receive threads. If set to 'auto' Suricata will first try
     # to use CPU (core) count and otherwise RSS queue count.
     threads: auto
