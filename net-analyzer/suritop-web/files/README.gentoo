@@ -1,0 +1,119 @@
+# suritop-web — Security Monitoring System for Gentoo Linux
+
+## Description
+
+suritop-web combines Suricata IDS, ModSecurity WAF, Fail2Ban, and iptables
+into a unified web dashboard with real-time attack map and monitoring.
+
+## Components
+
+- **Attack Map** — Real-time Leaflet.js map of attacks
+- **Admin Stats** — Detailed attack statistics and IP management
+- **Firewall Manager** — Web-based iptables management
+- **Suritop TUI** — Terminal (curses) IDS+WAF monitor
+- **Collectors** — Python daemons for log collection
+
+## Quick Start
+
+### 1. Configure
+
+Edit `/etc/conf.d/suritop-web` with your settings:
+- Database passwords
+- Server IP
+- Network interface
+- SSH port
+
+### 2. Database Setup
+
+```bash
+# Import schema
+mysql -u root -p < /usr/share/suritop-web/schema.sql
+
+# Create database users
+mysql -u root -p -e "
+  CREATE USER IF NOT EXISTS 'stats_reader'@'localhost' IDENTIFIED BY 'YOUR_PASSWORD';
+  GRANT SELECT ON server_stats.* TO 'stats_reader'@'localhost';
+  CREATE USER IF NOT EXISTS 'stats_writer'@'localhost' IDENTIFIED BY 'YOUR_PASSWORD';
+  GRANT INSERT,SELECT,DELETE ON server_stats.* TO 'stats_writer'@'localhost';
+  FLUSH PRIVILEGES;
+"
+```
+
+### 3. Suricata Setup (Optional)
+
+```bash
+# Copy configs to Suricata
+cp /etc/suritop-web/suricata.yaml /etc/suricata/
+cp /etc/suritop-web/classification.config /etc/suricata/
+cp /etc/suritop-web/reference.config /etc/suricata/
+cp /etc/suritop-web/threshold.config /etc/suricata/
+cp /etc/suritop-web/rules/local.rules /etc/suricata/rules/
+
+# Edit suricata.yaml to match your network
+nano /etc/suricata/suricata.yaml
+```
+
+### 4. Activate DROP Rules (OPTIONAL)
+
+**WARNING**: DROP rules will actively block traffic!
+
+```bash
+# Review the drop rules first
+cat /etc/suritop-web/drop.conf
+
+# When ready, copy to Suricata
+cp /etc/suritop-web/drop.conf /etc/suricata/
+
+# Edit suricata.yaml to enable drop:
+# detect:
+#   drop:
+#     enabled: yes
+```
+
+### 5. Nginx Setup
+
+```bash
+cp /etc/suritop-web/nginx-vhost.conf /etc/nginx/vhosts.d/
+# Edit server_name, SSL paths, and auth settings
+nano /etc/nginx/vhosts.d/nginx-vhost.conf
+```
+
+### 6. Enable Services
+
+```bash
+rc-update add suritop-iptables default
+rc-update add suritop-stats default
+rc-update add suritop-suri default
+rc-update add suritop-waf default
+
+rc-service suritop-iptables start
+rc-service suritop-stats start
+rc-service suritop-suri start
+rc-service suritop-waf start
+```
+
+## File Locations
+
+| Path | Description |
+|------|-------------|
+| `/etc/conf.d/suritop-web` | Main configuration |
+| `/etc/suritop-web/` | Suricata config templates |
+| `/opt/stats_collector/` | Python collectors |
+| `/opt/iptables-manager/` | iptables API daemon |
+| `/var/www/suritop-web/htdocs/` | PHP web files |
+| `/var/lib/stats_collector/` | State files |
+| `/usr/share/suritop-web/schema.sql` | Database schema |
+
+## TUI Monitor
+
+Run the terminal monitor:
+```bash
+su - stats_collector -c "python3 /opt/stats_collector/suritop.py"
+```
+
+## Troubleshooting
+
+- Check logs: `/var/log/stats_collector.log`, `/var/log/suricata_collector.log`
+- Verify MySQL connection: `mysql -u stats_writer -p -e "SELECT 1"`
+- Check Suricata: `rc-service suricata status`
+- Check collectors: `ps aux | grep stats_collector`
