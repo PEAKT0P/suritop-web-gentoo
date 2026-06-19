@@ -58,8 +58,8 @@ src_install() {
 
 	insopts -m0755 -o stats_collector -g stats_collector
 	doins "${S}"/suritop.py
-	dosym /opt/stats_collector/suritop.py /usr/bin/suritop
 
+	dosym /opt/stats_collector/suritop.py /usr/bin/suritop
 	diropts -m0755 -o root -g root
 	dodir /opt/iptables-manager
 	insinto /opt/iptables-manager
