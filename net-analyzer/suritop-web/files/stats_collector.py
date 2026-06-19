@@ -31,7 +31,7 @@ COLLECT_INTERVAL = 30
 METRICS_INTERVAL = 60
 BATCH_SIZE = 500
 
-NET_INTERFACE = 'enp6s0'
+NET_INTERFACE = _cfg['net_interface']
 NEXTCLOUD_LOG = '/media/nextcloud/nextcloud/nextcloud.log'
 
 MONITORED_FILES = {

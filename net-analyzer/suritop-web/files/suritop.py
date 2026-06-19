@@ -39,7 +39,30 @@ SKIP_PREFIXES = [
     'ET INFO possible Xiaomi phone',
     'ET INFO Observed DNS Query to vk.com',
 ]
-LOCAL_IPS = {'192.168.1.8','192.168.1.7','192.168.1.1', OUR_IP}
+def _get_local_ips():
+    """Определяем локальные IP динамически"""
+    ips = {OUR_IP}
+    try:
+        import socket
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        ips.add(local_ip)
+    except Exception:
+        pass
+    # Добавляем все адреса основного интерфейса
+    try:
+        import netifaces
+        for iface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface).get(netifaces.AF_INET, [])
+            for a in addrs:
+                ips.add(a['addr'])
+    except ImportError:
+        pass
+    # Добавляем стандартные приватные подсети шлюзов
+    ips.update({'192.168.1.1', '10.0.0.1', '172.16.0.1'})
+    return ips
+
+LOCAL_IPS = _get_local_ips()
 
 DB_HOST='localhost'; DB_USER='stats_writer'
 DB_PASS='St4ts_Wr1t3r_2026!'; DB_NAME='server_stats'

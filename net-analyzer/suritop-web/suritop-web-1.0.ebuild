@@ -179,6 +179,16 @@ pkg_config() {
 	einfo "  SSH Port:  ${DEFAULT_SSH}"
 	einfo ""
 
+	# ── Substitute @@placeholders@@ in config files ──
+	sed -i "s|@@SERVER_IP@@|${DEFAULT_IP}|g" "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
+	sed -i "s|@@NET_INTERFACE@@|${DEFAULT_IF}|g" "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
+	sed -i "s|@@SSH_PORT@@|${DEFAULT_SSH}|g" "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
+	sed -i "s|@@SERVER_IP@@|${DEFAULT_IP}|g" "${EROOT}/etc/suritop-web/collector.conf" 2>/dev/null
+	sed -i "s|@@NET_INTERFACE@@|${DEFAULT_IF}|g" "${EROOT}/etc/suritop-web/collector.conf" 2>/dev/null
+	sed -i "s|@@SERVER_IP@@|${DEFAULT_IP}|g" "${EROOT}/etc/suritop-web/suricata.yaml" 2>/dev/null
+	sed -i "s|@@NET_INTERFACE@@|${DEFAULT_IF}|g" "${EROOT}/etc/suritop-web/suricata.yaml" 2>/dev/null
+	einfo "Config files templated with detected values"
+
 	# ── 1. Nginx + Basic Auth ──
 	equestion "Setup nginx with basic auth (admin:admin)? [Y/n]"
 	read -r REPLY

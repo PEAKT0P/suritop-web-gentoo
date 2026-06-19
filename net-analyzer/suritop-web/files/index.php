@@ -1077,7 +1077,7 @@ async function loadMetrics(){
         } else tc2.innerHTML='<div class="sr"><span class="sr-l">Нет данных</span></div>';
 
         document.getElementById('srvInfo').innerHTML=
-            sr('Интерфейс','enp6s0','--cy')+sr('Интервал','60 сек','--dm')+sr('Хранение','3 мес','--dm');
+            sr('Интерфейс',NET_IF,'--cy')+sr('Интервал','60 сек','--dm')+sr('Хранение','3 мес','--dm');
     }catch(e){console.error(e)}
 }
 

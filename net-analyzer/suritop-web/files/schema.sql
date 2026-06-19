@@ -154,7 +154,7 @@ DROP TABLE IF EXISTS `net_traffic`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `net_traffic` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `interface` varchar(20) NOT NULL DEFAULT 'enp6s0',
+  `interface` varchar(20) NOT NULL DEFAULT '',
   `rx_mbytes_s` decimal(10,3) DEFAULT NULL COMMENT 'MB/s входящий',
   `tx_mbytes_s` decimal(10,3) DEFAULT NULL COMMENT 'MB/s исходящий',
   `rx_bytes` bigint(20) unsigned DEFAULT NULL COMMENT 'байт за интервал',

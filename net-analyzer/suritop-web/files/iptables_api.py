@@ -246,7 +246,7 @@ def check_port_firewall_status(ports, iptables_rules):
 
 def analyze_port_access(port, proto, input_rules):
     """
-    Анализируем, пропускает ли файрвол трафик на порт через enp6s0.
+    Анализируем, пропускает ли файрвол трафик на порт через интерфейс.
     Возвращает: 'open', 'blocked', 'limited', 'unknown'
     """
     for rule in input_rules:
@@ -265,7 +265,7 @@ def analyze_port_access(port, proto, input_rules):
                 if rule_proto != "all" and rule_proto != proto:
                     continue
 
-                if iface == "enp6s0" or iface == "*":
+                if iface == NET_IF or iface == "*":
                     if target == "DROP" or target == "REJECT":
                         return "blocked"
                     elif target == "ACCEPT":
@@ -273,7 +273,7 @@ def analyze_port_access(port, proto, input_rules):
                             return "limited"
                         return "open"
 
-    # Проверяем общие правила ACCEPT/DROP для enp6s0
+    # Проверяем общие правила ACCEPT/DROP для интерфейса
     for rule in input_rules:
         iface = rule.get("in", "*")
         target = rule.get("target", "")
@@ -283,8 +283,8 @@ def analyze_port_access(port, proto, input_rules):
         if "ESTABLISHED" in extra and target == "ACCEPT":
             continue  # не считаем это открытием порта
 
-        # Если есть blanket ACCEPT для enp6s0 без порта
-        if iface == "enp6s0" and target == "ACCEPT" and "dpt" not in extra:
+        # Если есть blanket ACCEPT для интерфейса без порта
+        if iface == NET_IF and target == "ACCEPT" and "dpt" not in extra:
             return "open"
 
     return "blocked_by_policy"  # policy DROP
@@ -488,11 +488,11 @@ def collect_all_data():
 # ─── Управление правилами ───
 
 def action_block_ip(ip):
-    """Заблокировать IP на enp6s0"""
+    """Заблокировать IP на интерфейс"""
     if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(/\d{1,2})?$", ip):
         return {"error": "Invalid IP format"}
 
-    result = run_cmd(f"iptables -I INPUT 1 -s {ip} -i enp6s0 -j DROP")
+    result = run_cmd(ff"iptables -I INPUT 1 -s {ip} -i {NET_IF} -j DROP")
     log(f"ACTION: block_ip {ip} -> {result}")
     return {"ok": True, "action": "block_ip", "ip": ip}
 
@@ -502,13 +502,13 @@ def action_unblock_ip(ip):
     if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(/\d{1,2})?$", ip):
         return {"error": "Invalid IP format"}
 
-    result = run_cmd(f"iptables -D INPUT -s {ip} -i enp6s0 -j DROP")
+    result = run_cmd(ff"iptables -D INPUT -s {ip} -i {NET_IF} -j DROP")
     log(f"ACTION: unblock_ip {ip} -> {result}")
     return {"ok": True, "action": "unblock_ip", "ip": ip}
 
 
 def action_open_port(port, proto="tcp"):
-    """Открыть порт на enp6s0"""
+    """Открыть порт на интерфейс"""
     try:
         port = int(port)
     except:
@@ -525,14 +525,14 @@ def action_open_port(port, proto="tcp"):
 
     # Вставляем перед правилами DROP в конце
     result = run_cmd(
-        f"iptables -I INPUT 5 -i enp6s0 -p {proto} --dport {port} -j ACCEPT"
+        ff"iptables -I INPUT 5 -i {NET_IF} -p {proto} --dport {port} -j ACCEPT"
     )
     log(f"ACTION: open_port {port}/{proto} -> {result}")
     return {"ok": True, "action": "open_port", "port": port, "proto": proto}
 
 
 def action_close_port(port, proto="tcp"):
-    """Закрыть порт на enp6s0"""
+    """Закрыть порт на интерфейс"""
     try:
         port = int(port)
     except:
@@ -542,7 +542,7 @@ def action_close_port(port, proto="tcp"):
         return {"error": "Invalid protocol"}
 
     result = run_cmd(
-        f"iptables -D INPUT -i enp6s0 -p {proto} --dport {port} -j ACCEPT"
+        ff"iptables -D INPUT -i {NET_IF} -p {proto} --dport {port} -j ACCEPT"
     )
     log(f"ACTION: close_port {port}/{proto} -> {result}")
     return {"ok": True, "action": "close_port", "port": port, "proto": proto}
