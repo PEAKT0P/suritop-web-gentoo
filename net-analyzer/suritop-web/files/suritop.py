@@ -9,6 +9,7 @@ Keys:   q/Esc=quit  p=pause  c=clear  f=filter  d=detail
         PgUp/PgDn=fast scroll  Home=top
 """
 
+import sys
 import curses
 sys.path.insert(0, '/opt/stats_collector')
 from suritop_config import get_config
