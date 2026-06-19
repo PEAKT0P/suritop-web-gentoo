@@ -14,20 +14,12 @@ import sys
 import time
 import signal
 import logging
-import configparser
 from datetime import datetime
 from collections import deque
 from utils import LogTailer
+from suritop_config import get_config
 
-# ── Читаем конфиг ──
-config = configparser.ConfigParser()
-config.read('/opt/stats_collector/collector.conf')
-
-# ── Конфигурация ──
-DB_HOST = 'localhost'
-DB_NAME = 'server_stats'
-DB_USER = 'stats_writer'
-DB_PASS = 'St4ts_Wr1t3r_2026!'
+_cfg = get_config()
 
 EVE_LOG = '/var/log/suricata/eve.json'
 STATE_FILE = '/var/lib/stats_collector/suricata.pos'
@@ -35,7 +27,7 @@ DAEMON_LOG = '/var/log/suricata_collector.log'
 
 COLLECT_INTERVAL = 15   # секунд между flush в БД
 BATCH_SIZE = 300
-OUR_IP = config.get('Network', 'our_ip', fallback='37.204.57.87')
+OUR_IP = _cfg['our_ip']
 
 # Шумные сигнатуры — пропускаем (не атаки, артефакты NAT/протоколов)
 SKIP_SIG_PREFIXES = [
@@ -67,16 +59,16 @@ def get_db():
     try:
         import MySQLdb
         conn = MySQLdb.connect(
-            host=DB_HOST, user=DB_USER, passwd=DB_PASS,
-            db=DB_NAME, charset='utf8mb4', connect_timeout=5
+            host=_cfg['db_host'], user=_cfg['db_user_w'], passwd=_cfg['db_pass_w'],
+            db=_cfg['db_name'], charset='utf8mb4', connect_timeout=5
         )
         conn.autocommit(False)
         return conn
     except ImportError:
         import pymysql
         conn = pymysql.connect(
-            host=DB_HOST, user=DB_USER, password=DB_PASS,
-            database=DB_NAME, charset='utf8mb4',
+            host=_cfg['db_host'], user=_cfg['db_user_w'], password=_cfg['db_pass_w'],
+            database=_cfg['db_name'], charset='utf8mb4',
             connect_timeout=5, autocommit=False
         )
         return conn

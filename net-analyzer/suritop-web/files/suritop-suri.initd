@@ -18,6 +18,7 @@ depend() {
 }
 
 start_pre() {
+	getent group suricata | grep -q stats_collector || usermod -aG suricata stats_collector 2>/dev/null
     checkpath --directory --owner stats_collector:stats_collector --mode 0755 /run/suritop-web
     checkpath --directory --owner stats_collector:stats_collector --mode 0755 /var/lib/stats_collector 2>/dev/null || true
 }

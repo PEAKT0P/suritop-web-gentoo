@@ -16,12 +16,9 @@ import logging
 from datetime import datetime
 from collections import deque
 from utils import LogTailer
+from suritop_config import get_config
 
-# ── Конфигурация ──
-DB_HOST = 'localhost'
-DB_NAME = 'server_stats'
-DB_USER = 'stats_writer'
-DB_PASS = 'St4ts_Wr1t3r_2026!'
+_cfg = get_config()
 
 MODSEC_LOG = '/var/log/modsec_audit.log'
 STATE_FILE = '/var/lib/stats_collector/modsec.pos'
@@ -56,16 +53,16 @@ def get_db():
     try:
         import MySQLdb
         conn = MySQLdb.connect(
-            host=DB_HOST, user=DB_USER, passwd=DB_PASS,
-            db=DB_NAME, charset='utf8mb4', connect_timeout=5
+            host=_cfg['db_host'], user=_cfg['db_user_w'], passwd=_cfg['db_pass_w'],
+            db=_cfg['db_name'], charset='utf8mb4', connect_timeout=5
         )
         conn.autocommit(True)
         return conn
     except ImportError:
         import pymysql
         conn = pymysql.connect(
-            host=DB_HOST, user=DB_USER, password=DB_PASS,
-            database=DB_NAME, charset='utf8mb4',
+            host=_cfg['db_host'], user=_cfg['db_user_w'], password=_cfg['db_pass_w'],
+            database=_cfg['db_name'], charset='utf8mb4',
             connect_timeout=5, autocommit=True
         )
         return conn

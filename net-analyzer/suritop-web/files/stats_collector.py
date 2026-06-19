@@ -17,10 +17,9 @@ from collections import deque
 from utils import LogTailer
 
 # ── Конфигурация ──
-DB_HOST = 'localhost'
-DB_NAME = 'server_stats'
-DB_USER = 'stats_writer'
-DB_PASS = 'St4ts_Wr1t3r_2026!'
+from suritop_config import get_config
+
+_cfg = get_config()
 
 LOG_DIR = '/var/log'
 NGINX_LOG_DIR = '/var/log/nginx'
@@ -33,6 +32,7 @@ METRICS_INTERVAL = 60
 BATCH_SIZE = 500
 
 NET_INTERFACE = 'enp6s0'
+NEXTCLOUD_LOG = '/media/nextcloud/nextcloud/nextcloud.log'
 
 MONITORED_FILES = {
     'messages': f'{LOG_DIR}/messages',
@@ -104,24 +104,20 @@ def get_db():
     try:
         import MySQLdb
         conn = MySQLdb.connect(
-            host=DB_HOST, user=DB_USER, passwd=DB_PASS,
-            db=DB_NAME, charset='utf8mb4',
+            host=_cfg['db_host'], user=_cfg['db_user_w'], passwd=_cfg['db_pass_w'],
+            db=_cfg['db_name'], charset='utf8mb4',
             connect_timeout=5
         )
         conn.autocommit(True)
         return conn
     except ImportError:
-        try:
-            import pymysql
-            conn = pymysql.connect(
-                host=DB_HOST, user=DB_USER, password=DB_PASS,
-                database=DB_NAME, charset='utf8mb4',
-                connect_timeout=5, autocommit=True
-            )
-            return conn
-        except ImportError:
-            logging.error("Нужен MySQLdb или pymysql: pip install mysqlclient или pymysql")
-            sys.exit(1)
+        import pymysql
+        conn = pymysql.connect(
+            host=_cfg['db_host'], user=_cfg['db_user_w'], password=_cfg['db_pass_w'],
+            database=_cfg['db_name'], charset='utf8mb4',
+            connect_timeout=5, autocommit=True
+        )
+        return conn
 
 
 def parse_syslog_date(datestr):
@@ -221,6 +217,7 @@ def process_nginx_access(lines, log_name):
                     logged_at
                 ))
 
+def process_nextcloud_log(lines):
     import json
     for line in lines:
         try:
@@ -526,7 +523,12 @@ def main():
         state_file = os.path.join(STATE_DIR, f'nginx_{log_name}.pos')
         nginx_tailers[log_name] = LogTailer(log_path, state_file)
 
+    nc_tailer = None
+    if os.path.exists(NEXTCLOUD_LOG):
+        nc_tailer = LogTailer(NEXTCLOUD_LOG, os.path.join(STATE_DIR, 'nextcloud.pos'))
+        logging.info(f"Monitoring Nextcloud log: {NEXTCLOUD_LOG}")
     else:
+        logging.info(f"Nextcloud log not found: {NEXTCLOUD_LOG}, skipping")
 
     conn = get_db()
     logging.info("Connected to MySQL")
@@ -553,7 +555,10 @@ def main():
                 if lines:
                     process_nginx_access(lines, log_name)
 
+            if nc_tailer:
+                lines = nc_tailer.read_new_lines()
                 if lines:
+                    process_nextcloud_log(lines)
 
             total_buf = len(ipt_buffer) + len(f2b_buffer) + len(nginx_buffer) + len(ssh_buffer) + len(nc_auth_buffer)
             if total_buf > 0:
