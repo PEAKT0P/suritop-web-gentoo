@@ -117,6 +117,7 @@ src_install() {
 	newinitd "${S}"/suritop-stats.initd suritop-stats
 	newinitd "${S}"/suritop-suri.initd suritop-suri
 	newinitd "${S}"/suritop-waf.initd suritop-waf
+	newinitd "${S}"/suritop-geo.initd suritop-geo
 	newinitd "${S}"/suritop-iptables.initd suritop-iptables
 
 	if use iptables; then
@@ -378,7 +379,7 @@ F2B_EOF
 	einfo "Enable services in default runlevel? [Y/n]"
 	read -r REPLY
 	if [[ "${REPLY}" != "n" && "${REPLY}" != "N" ]]; then
-		for svc in suritop-stats suritop-suri suritop-waf suritop-iptables iptables-manager fail2ban suricata; do
+		for svc in suritop-stats suritop-suri suritop-waf suritop-geo suritop-iptables iptables-manager fail2ban suricata; do
 			rc-update add ${svc} default 2>/dev/null
 		done
 		rc-update add iptables default 2>/dev/null
