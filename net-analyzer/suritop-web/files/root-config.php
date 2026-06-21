@@ -7,8 +7,16 @@ $defaults = [
 ];
 $db = $defaults;
 if (file_exists($conf_file)) {
-    $ini = parse_ini_file($conf_file, true);
+    $section = "";
+    $ini = [];
+    foreach (file($conf_file) as $line) {
+        $line = trim($line);
+        if ($line === "" || $line[0] === "#" || $line[0] === ";") continue;
+        if (preg_match('/^\[(.+)\]$/', $line, $m)) { $section = $m[1]; continue; }
+        if (preg_match('/^(\w+)\s*=\s*(.+)$/', $line, $m)) { $ini[$section][$m[1]] = trim($m[2]); }
+    }
     if (isset($ini["Database"])) $db = array_merge($db, $ini["Database"]);
+    if (isset($ini["Network"]["our_ip"])) define("OUR_IP", $ini["Network"]["our_ip"]);
 }
 define("STATS_DB_HOST", $db["host"]);
 define("STATS_DB_NAME", $db["name"]);

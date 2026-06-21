@@ -30,18 +30,18 @@ html,body{height:100%;overflow:hidden;background:#0a0e14;font-family:"JetBrains 
 <div class="frame">
   <div class="left panel" id="leftPanel">
     <span class="panel-label">&#x2694; Threat Map</span>
-    <iframe src="/attackmap/" loading="lazy"></iframe>
+    <iframe src="attackmap/" loading="lazy"></iframe>
   </div>
   <div class="h-splitter" id="hSplitter"></div>
   <div class="right" id="rightPanel">
     <div class="right-top panel" id="topPanel">
       <span class="panel-label">&#x1f4ca; Admin Stats</span>
-      <iframe src="/admin_stats.php" loading="lazy"></iframe>
+      <iframe src="admin_stats.php" loading="lazy"></iframe>
     </div>
     <div class="v-splitter" id="vSplitter"></div>
     <div class="right-bottom panel" id="bottomPanel">
       <span class="panel-label">&#x26e2; Firewall</span>
-      <iframe src="/iptables/" loading="lazy"></iframe>
+      <iframe src="iptables/" loading="lazy"></iframe>
     </div>
   </div>
 </div>

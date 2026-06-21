@@ -1,41 +1,21 @@
 <?php
-/**
- * /var/www/suritop-web/htdocs/attackmap/config.php
- * Database configuration — reads from environment or defaults
- */
-
-// Try environment variables first (set via nginx fastcgi_param or /etc/conf.d)
-define('STATS_DB_HOST', getenv('SURITOP_DB_HOST') ?: 'localhost');
-define('STATS_DB_NAME', getenv('SURITOP_DB_NAME') ?: 'server_stats');
-define('STATS_DB_USER', getenv('SURITOP_DB_USER_R') ?: 'stats_reader');
-define('STATS_DB_PASS', getenv('SURITOP_DB_PASS_R') ?: '');
-
-// Fallback: read from collector.conf if env not set
-if (!STATS_DB_PASS) {
-    $conf_file = '/etc/suritop-web/collector.conf';
-    if (file_exists($conf_file)) {
-        $ini = parse_ini_file($conf_file, true);
-        if (isset($ini['Database'])) {
-            define('STATS_DB_HOST', $ini['Database']['host'] ?? 'localhost');
-            define('STATS_DB_NAME', $ini['Database']['name'] ?? 'server_stats');
-            define('STATS_DB_USER', $ini['Database']['user_r'] ?? 'stats_reader');
-            define('STATS_DB_PASS', $ini['Database']['pass_r'] ?? '');
-        }
-    }
+$conf_file = '/etc/suritop-web/collector.conf';
+$defaults = ['host' => 'localhost', 'name' => 'server_stats', 'user_r' => 'stats_reader', 'pass_r' => '', 'user_w' => 'stats_writer', 'pass_w' => ''];
+$db = $defaults;
+if (file_exists($conf_file)) {
+    $section = ""; $ini = [];
+    foreach (file($conf_file) as $l) { $l = trim($l); if ($l === "" || $l[0] === "#" || $l[0] === ";") continue; if (preg_match('/^\[(.+)\]$/', $l, $m)) { $section = $m[1]; continue; } if (preg_match('/^(\w+)\s*=\s*(.+)$/', $l, $m)) { $ini[$section][$m[1]] = trim($m[2]); } }
+    if (isset($ini["Database"])) $db = array_merge($db, $ini["Database"]);
 }
-
-// Cache settings
+define('STATS_DB_HOST', $db["host"]);
+define('STATS_DB_NAME', $db["name"]);
+define('STATS_DB_USER', $db["user_r"]);
+define('STATS_DB_PASS', $db["pass_r"]);
 define('CACHE_FILE', '/tmp/attack_replay_cache.json');
 define('CACHE_TTL', 300);
-
-// Realtime settings
 define('RT_POLL_INTERVAL', 5000);
 define('RT_MIN_DELAY', 200);
 define('RT_FETCH_LIMIT', 50);
-
-// Refresh intervals (ms)
 define('STATS_REFRESH_INTERVAL', 30000);
 define('CHARTS_REFRESH_INTERVAL', 120000);
-
-// Theme
 define('DEFAULT_THEME', 'dark');
