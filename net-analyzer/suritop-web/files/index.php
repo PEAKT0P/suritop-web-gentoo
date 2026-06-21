@@ -656,7 +656,7 @@ window.DEFAULT_THEME='<?php echo defined('DEFAULT_THEME') ? DEFAULT_THEME : 'dar
 (function(){
 'use strict';
 
-const MSK=[55.7558,37.6173],B='/attackmap/';
+const MSK=[55.7558,37.6173],B='<?= ATTACKMAP_BASE_URL ?>';
 const CLR=['#dc2626','#ea580c','#d97706','#ca8a04','#0284c7','#7e22ce','#be185d','#16a34a','#ef4444','#f97316'];
 let ci=0;function nc(){return CLR[ci++%CLR.length]}
 

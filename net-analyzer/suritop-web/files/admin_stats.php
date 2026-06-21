@@ -253,7 +253,7 @@ if (isset($_GET['api'])) {
     // Инициализация: получаем CSRF токен для API
     async function initApi() {
         try {
-            const res = await fetch('/iptables/api.php?action=csrf_token');
+            const res = await fetch('iptables/api.php?action=csrf_token');
             const data = await res.json();
             if (data.token) {
                 csrfToken = data.token;
@@ -284,7 +284,7 @@ if (isset($_GET['api'])) {
         }
 
         try {
-            const res = await fetch('/iptables/api.php', {
+            const res = await fetch('iptables/api.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
