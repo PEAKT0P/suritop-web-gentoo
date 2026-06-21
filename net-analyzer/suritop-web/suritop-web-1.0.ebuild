@@ -82,8 +82,8 @@ src_install() {
 	insinto /var/www/suritop-web/htdocs
 	insopts -m0644
 	doins "${S}"/admin_stats.php
-	doins "${S}"/root-index.php index.php
-	doins "${S}"/root-config.php config.php
+	newins "${S}"/root-index.php index.php
+	newins "${S}"/root-config.php config.php
 
 	insinto /var/www/suritop-web/htdocs/attackmap
 	doins "${S}"/index.php
@@ -91,7 +91,7 @@ src_install() {
 
 	insinto /var/www/suritop-web/htdocs/iptables
 	doins "${S}"/api.php
-	doins "${S}"/iptables_index.html iptables/index.html
+	newins "${S}"/iptables_index.html index.html
 
 	insopts -m0644
 	insinto /etc/suritop-web
@@ -114,13 +114,13 @@ src_install() {
 	insopts -m0644
 	newins "${S}"/suritop-web.conf suritop-web
 
-	doinitd "${S}"/suritop-stats.initd
-	doinitd "${S}"/suritop-suri.initd
-	doinitd "${S}"/suritop-waf.initd
-	doinitd "${S}"/suritop-iptables.initd
+	newinitd "${S}"/suritop-stats.initd suritop-stats
+	newinitd "${S}"/suritop-suri.initd suritop-suri
+	newinitd "${S}"/suritop-waf.initd suritop-waf
+	newinitd "${S}"/suritop-iptables.initd suritop-iptables
 
 	if use iptables; then
-		doinitd "${S}"/suritop-iptables-setup
+		newinitd "${S}"/suritop-iptables-setup suritop-iptables-setup
 	fi
 
 	insinto /etc/logrotate.d
@@ -131,7 +131,7 @@ src_install() {
 	newins "${S}"/schema.sql schema.sql
 
 	diropts -m0755 -o stats_collector -g stats_collector
-	dodir /var/lib/stats_collector
+	keepdir /var/lib/stats_collector
 
 	dodir /etc/nginx/vhosts.d
 
@@ -170,9 +170,12 @@ pkg_config() {
 
 	DEFAULT_IF=$(ip -o route get 1.1.1.1 2>/dev/null | awk '{print $5}' | head -1)
 	DEFAULT_IF=${DEFAULT_IF:-eth0}
-	DEFAULT_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+	DEFAULT_IP=$(ip -o route get 1.1.1.1 2>/dev/null | awk '{print $7}' | head -1)
+	if [[ -z "${DEFAULT_IP}" ]]; then
+		DEFAULT_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+	fi
 	DEFAULT_IP=${DEFAULT_IP:-127.0.0.1}
-	DEFAULT_SSH=$(grep -oP "(?<=Port )\d+" "${EROOT}/etc/ssh/sshd_config" 2>/dev/null | head -1)
+	DEFAULT_SSH=$(grep -E "^Port\s+" "${EROOT}/etc/ssh/sshd_config" 2>/dev/null | awk '{print $2}' | head -1)
 	DEFAULT_SSH=${DEFAULT_SSH:-22}
 
 	einfo "Detected network:"
@@ -224,12 +227,27 @@ print(f'admin:{r.stdout.strip()}')
 			DB_CMD=$(command -v mariadb 2>/dev/null || command -v mysql)
 
 			DB_OK=0
+			DB_OPTS=""
 			if ${DB_CMD} -u root -e "SELECT 1" >/dev/null 2>&1; then
 				DB_OK=1
 				DB_OPTS="-u root"
-			elif ${DB_CMD} -u root -p'' -e "SELECT 1" >/dev/null 2>&1; then
-				DB_OK=1
-				DB_OPTS="-u root"
+			fi
+
+			if [[ ${DB_OK} -eq 0 ]]; then
+				einfo "MariaDB requires root password."
+				einfo "Enter MariaDB root password (leave empty if none):"
+				read -rs DB_ROOT_PASS
+				if [[ -n "${DB_ROOT_PASS}" ]]; then
+					if ${DB_CMD} -u root -p"${DB_ROOT_PASS}" -e "SELECT 1" >/dev/null 2>&1; then
+						DB_OK=1
+						DB_OPTS="-u root -p${DB_ROOT_PASS}"
+					else
+						ewarn "Cannot connect to MariaDB with provided password"
+					fi
+				else
+					ewarn "Cannot connect to MariaDB as root without password"
+					ewarn "Run manually: mariadb -u root -p < /usr/share/suritop-web/schema.sql"
+				fi
 			fi
 
 			if [[ ${DB_OK} -eq 1 ]]; then
