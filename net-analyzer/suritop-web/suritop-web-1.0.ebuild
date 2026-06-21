@@ -172,6 +172,9 @@ pkg_config() {
 	DEFAULT_IF=${DEFAULT_IF:-eth0}
 	DEFAULT_IP=$(ip -o route get 1.1.1.1 2>/dev/null | awk '{print $7}' | head -1)
 	if [[ -z "${DEFAULT_IP}" ]]; then
+		DEFAULT_IP=$(ip -4 addr show 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d/ -f1 | head -1)
+	fi
+	if [[ -z "${DEFAULT_IP}" ]]; then
 		DEFAULT_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 	fi
 	DEFAULT_IP=${DEFAULT_IP:-127.0.0.1}
@@ -189,6 +192,8 @@ pkg_config() {
 	sed -i "s|@@SSH_PORT@@|${DEFAULT_SSH}|g" "${EROOT}/etc/conf.d/suritop-web" 2>/dev/null
 	sed -i "s|@@SERVER_IP@@|${DEFAULT_IP}|g" "${EROOT}/etc/suritop-web/collector.conf" 2>/dev/null
 	sed -i "s|@@NET_INTERFACE@@|${DEFAULT_IF}|g" "${EROOT}/etc/suritop-web/collector.conf" 2>/dev/null
+	sed -i "s|@@SERVER_IP@@|${DEFAULT_IP}|g" "${EROOT}/opt/stats_collector/collector.conf" 2>/dev/null
+	sed -i "s|@@NET_INTERFACE@@|${DEFAULT_IF}|g" "${EROOT}/opt/stats_collector/collector.conf" 2>/dev/null
 	sed -i "s|@@SERVER_IP@@|${DEFAULT_IP}|g" "${EROOT}/etc/suritop-web/suricata.yaml" 2>/dev/null
 	sed -i "s|@@NET_INTERFACE@@|${DEFAULT_IF}|g" "${EROOT}/etc/suritop-web/suricata.yaml" 2>/dev/null
 	einfo "Config files templated with detected values"
