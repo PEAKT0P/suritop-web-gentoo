@@ -1,11 +1,8 @@
 <?php
 /**
- * /var/www/suritop-web/htdocs/attackmap/index.php  v9.3
+ * /var/www/suritop-web/htdocs/attackmap/index.php  v9.4
  * Карта атак — реалтайм + воспроизведение (с кешем)
- * v8: UI V3 — Glassmorphism, Топографическая тема
- * v9: Fixes — Драг-н-дроп панелей, фикс тултипов
- * v9.1: Fixes — Возвращаем видимость ландшафта в темной теме (настройка CSS фильтров)
- * v9.2: CYBER RADIO INTEGRATION — Сонификация трафика (FSK модуляция)
+ * Фиксы: Удержание панелей в области видимости при смене размеров окна. 
  */
 
 require_once __DIR__ . '/config.php';
@@ -194,17 +191,13 @@ if (isset($_GET['ids'])) {
     } catch(Exception $e) { $result['error'] = $e->getMessage(); }
     echo json_encode($result, JSON_UNESCAPED_UNICODE); exit;
 }
-
-// ═══════════════════════════════════════════
-// UI V3.2 (Fixed Dark Landscape Contrast)
-// ═══════════════════════════════════════════
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>⚔ THREAT MAP — Server Defense V3.2</title>
+<title>⚔ THREAT MAP — Server Defense</title>
 <script>
 (function(){
     try{
@@ -219,11 +212,10 @@ if (isset($_GET['ids'])) {
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 
-/* ================== DARK THEME (Default) ================== */
+/* ================== DARK THEME ================== */
 :root{
-    /* ФИКС ФОНА: Чуть светлее, чтобы не сливалось в бездну */
-    --bg:#0d1117;
-    --pn:rgba(15, 23, 42, 0.65);
+    --bg:#0a0e14;
+    --pn:rgba(15, 23, 42, 0.75);
     --gl-blur: blur(12px);
     --pb:rgba(255,255,255,.1);
     --gl:rgba(255,50,50,.25);
@@ -238,32 +230,22 @@ if (isset($_GET['ids'])) {
     --pu:#af52de;
 
     --tx:#e2e8f0;
-    --dm:#94a3b8; /* Чуть ярче для читаемости */
+    --dm:#94a3b8;
     --fm:'Share Tech Mono','JetBrains Mono',monospace;
     --fd:'Orbitron',sans-serif;
 
-    --panel-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --panel-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
-/* ================== LIGHT THEME (Landscape) ================== */
+/* ================== LIGHT THEME (Landscape Map) ================== */
 :root[data-theme="light"]{
     --bg:#f1f5f9;
-    --pn:rgba(255, 255, 255, 0.75);
+    --pn:rgba(255, 255, 255, 0.85);
     --pb:rgba(15, 23, 42, 0.12);
     --gl:rgba(15, 23, 42, 0.1);
-
-    --red:#dc2626;
-    --rdd:#991b1b;
-    --rg:rgba(220, 38, 38, 0.4);
-    --ora:#d97706;
-    --cy:#0284c7;
-    --gn:#16a34a;
-    --yl:#ca8a04;
-    --pu:#7e22ce;
-
-    --tx:#0f172a;
-    --dm:#475569;
-
+    --red:#dc2626; --rdd:#991b1b; --rg:rgba(220, 38, 38, 0.4);
+    --ora:#d97706; --cy:#0284c7; --gn:#16a34a; --yl:#ca8a04; --pu:#7e22ce;
+    --tx:#0f172a; --dm:#475569;
     --panel-shadow: 0 8px 32px rgba(30, 41, 59, 0.15);
 }
 
@@ -304,13 +286,11 @@ if (isset($_GET['ids'])) {
 .leaflet-tile-pane { transition: filter 0.6s ease; }
 :root[data-theme="dark"] .leaflet-tile-pane,
 :root:not([data-theme="light"]) .leaflet-tile-pane {
-    /* ФИКС: Делаем карту светлее и контрастнее, чтобы ландшафт не тонул во тьме */
-filter: invert(100%) hue-rotate(180deg) brightness(160%) contrast(90%) saturate(110%);
+    filter: invert(100%) hue-rotate(180deg) brightness(130%) contrast(90%) saturate(110%);
 }
 :root[data-theme="light"] .leaflet-tile-pane {
     filter: brightness(85%) contrast(110%);
 }
-
 
 /* ================== GLOBAL ================== */
 html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-family:var(--fm);overflow:hidden}
@@ -328,12 +308,13 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 .hud{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:48px;
     background:var(--pn); backdrop-filter: var(--gl-blur); -webkit-backdrop-filter: var(--gl-blur);
     border-bottom:1px solid var(--pb); box-shadow: 0 4px 20px rgba(0,0,0,0.1);}
-.hud-l{display:flex;align-items:center;gap:12px}
+.hud-l{display:flex;align-items:center;gap:12px; flex-wrap: wrap;}
 .hud-l h1{font-family:var(--fd);font-size:12px;font-weight:700;letter-spacing:3px;color:var(--red);text-shadow:0 0 10px var(--rg)}
 .live-b{display:flex;align-items:center;gap:6px;padding:3px 8px;background:rgba(255,50,50,.1);border:1px solid rgba(255,50,50,.2);border-radius:12px;font-size:9px;font-weight:bold;color:var(--red);letter-spacing:1px}
 .live-d{width:6px;height:6px;background:var(--red);border-radius:50%;animation:bk 1.2s infinite; box-shadow: 0 0 6px var(--red);}
 @keyframes bk{0%,100%{opacity:1}50%{opacity:.3}}
-.hud-r{display:flex;gap:16px;align-items:center}
+.hud-r{display:flex;gap:16px;align-items:center; overflow-x: auto;}
+.hud-r::-webkit-scrollbar { display: none; }
 .hs{text-align:center;min-width:48px}
 .hs-v{font-family:var(--fd);font-size:14px;font-weight:700;line-height:1.1}
 .hs-l{font-size:7px;color:var(--dm);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px}
@@ -392,7 +373,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 .waf-pnl, .ids-pnl{
     position:fixed; z-index:1000; width:360px; max-height:240px;
     background:var(--pn); backdrop-filter: var(--gl-blur); -webkit-backdrop-filter: var(--gl-blur);
-    border-radius:8px; display:flex; flex-direction:column; transition:all .3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius:8px; display:flex; flex-direction:column; transition:max-height .3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: var(--panel-shadow);
 }
 .waf-pnl{border:1px solid rgba(255,149,0,.3);}
@@ -407,7 +388,6 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 
 .waf-pnl-hd{border-bottom:1px solid rgba(255,149,0,.15);}
 .ids-pnl-hd{border-bottom:1px solid rgba(175,82,222,.15);}
-
 .waf-pnl-hd:hover{background:rgba(255,149,0,.05)}
 .ids-pnl-hd:hover{background:rgba(175,82,222,.05)}
 
@@ -437,16 +417,15 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 .ids-row:hover{background:rgba(175,82,222,.08)}
 
 @keyframes rowIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-.waf-row-ip{color:var(--ora);font-weight:700;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ids-row-ip{color:var(--pu);font-weight:700;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
+.waf-row-ip, .ids-row-ip{font-weight:700;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.waf-row-ip{color:var(--ora);}
+.ids-row-ip{color:var(--pu);}
 .waf-row-info, .ids-row-info{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)}
 .waf-row-info b, .ids-row-info b{color:var(--cy);font-weight:700}
 .waf-row-time, .ids-row-time{color:var(--dm);font-size:8.5px;text-align:right}
 
 .waf-row.new{border-left:3px solid var(--ora);background:rgba(255,149,0,.12)}
 .ids-row.new{border-left:3px solid var(--pu);background:rgba(175,82,222,.12)}
-
 .waf-empty, .ids-empty{padding:16px;text-align:center;color:var(--dm);font-size:10px}
 .le-tag.ids{background:rgba(175,82,222,.25);color:var(--pu)}
 
@@ -464,7 +443,6 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 .hb:hover{opacity:1; background:var(--cy)!important;}
 .hb .ht{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--pn); backdrop-filter: var(--gl-blur); border:1px solid var(--pb);padding:4px 8px;font-size:9px;white-space:nowrap;border-radius:4px;margin-bottom:4px;z-index:10; box-shadow: var(--panel-shadow);}
 .hb:hover .ht{display:block}
-/*фикс*/
 .hb:last-child .ht {left:auto;right:-5px;transform: none;}
 .sr{display:flex;justify-content:space-between;padding:4px 0;font-size:10.5px;border-bottom:1px solid rgba(255,255,255,.05)}
 .sr:last-child{border:none}
@@ -528,18 +506,15 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 /* ── MOBILE ── */
 @media(max-width:900px){
     .pr{width:280px}.pr.off{transform:translateX(300px)}
+    .hud-r{gap:8px}.hs-v{font-size:12px}.hs-l{font-size:6.5px}
 }
 @media(max-width:600px){
     .pr{width:260px;top:90px;bottom:40px}.pr.off{transform:translateX(280px)}
     .btm{padding:6px 10px}
     .pl{display:none}
-    .waf-pnl{width:calc(100% - 24px);max-height:160px;}
-    .waf-pnl.collapsed{max-height:34px}
-    .waf-pnl-body{max-height:125px}
-    .ids-pnl{width:calc(100% - 24px);max-height:160px;}
-    .ids-pnl.collapsed{max-height:34px}
-    .ids-pnl-body{max-height:125px}
-    .hud-r{gap:8px}.hs-v{font-size:12px}.hs-l{font-size:6.5px}
+    .waf-pnl, .ids-pnl{width:calc(100% - 24px) !important; max-height:160px;}
+    .waf-pnl.collapsed, .ids-pnl.collapsed{max-height:34px}
+    .waf-pnl-body, .ids-pnl-body{max-height:125px}
     .hud-l h1{font-size:10px;letter-spacing:2px}
     .live-b{padding:2px 6px;font-size:8px}
 }
@@ -557,7 +532,15 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 <canvas id="atkCanvas"></canvas>
 
 <div class="hud">
-    <div class="hud-l"><h1>THREAT MAP</h1><div class="live-b"><div class="live-d"></div>LIVE</div><button class="snd-btn" id="sndBtn" onclick="SND.toggle()" title="Звук атак">🔇</button><div class="theme-tgl" onclick="THEME.toggle()" title="Переключить тему"><span class="theme-tgl-ico" id="themeIco">🌙</span><div class="theme-tgl-track" id="themeTrack"><div class="theme-tgl-knob"></div></div></div></div>
+    <div class="hud-l">
+        <h1>THREAT MAP</h1>
+        <div class="live-b"><div class="live-d"></div>LIVE</div>
+        <button class="snd-btn" id="sndBtn" onclick="SND.toggle()" title="Звук атак">🔇</button>
+        <div class="theme-tgl" onclick="THEME.toggle()" title="Переключить тему">
+            <span class="theme-tgl-ico" id="themeIco">🌙</span>
+            <div class="theme-tgl-track" id="themeTrack"><div class="theme-tgl-knob"></div></div>
+        </div>
+    </div>
     <div class="hud-r">
         <div class="hs"><div class="hs-v" style="color:var(--red)" id="sv-d">—</div><div class="hs-l">Атак сегодня</div></div>
         <div class="hs"><div class="hs-v" style="color:var(--cy)" id="sv-i">—</div><div class="hs-l">Уник. IP</div></div>
@@ -573,7 +556,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 
 <div class="rbar">
     <button class="rb" id="modeBtn" onclick="MODE.toggle()"><span>📡</span> Реалтайм</button>
-<button class="rb" id="rpB" onclick="RP.toggle()"><span>▶</span> Воспроизвести</button>
+    <button class="rb" id="rpB" onclick="RP.toggle()"><span>▶</span> Воспроизвести</button>
     <button class="rb" id="rpS" onclick="RP.stop()" style="display:none"><span>⏹</span> Стоп</button>
     <div class="rprog" id="rpP" onclick="RP.seek(event)"><div class="rprog-f" id="rpF"></div></div>
     <div class="rinfo" id="rpI">—</div>
@@ -661,36 +644,28 @@ const CLR=['#dc2626','#ea580c','#d97706','#ca8a04','#0284c7','#7e22ce','#be185d'
 let ci=0;function nc(){return CLR[ci++%CLR.length]}
 
 // ==========================================
-// 📻 CYBER RADIO: FSK МОДУЛЯТОР (ЗАМЕНА СТАРОГО SND)
+// 📻 CYBER RADIO: FSK МОДУЛЯТОР 
 // ==========================================
 const SND = {
-    ctx: null, mode: 0,
-    baudRate: 2400,
-    queue: Promise.resolve(),
-
+    ctx: null, mode: 0, baudRate: 2400, queue: Promise.resolve(),
     init() {
         if (this.ctx) return;
         try {
             this.ctx = new (window.AudioContext || window.webkitAudioContext)();
             if (this.ctx.state === 'suspended') this.ctx.resume();
-        } catch (e) { console.warn('No audio'); }
+        } catch (e) {}
     },
-
     restore() {
         this.mode = 1;
         document.addEventListener('DOMContentLoaded', () => {
             const btn = document.getElementById('sndBtn');
             if (btn) {
-                btn.textContent = '🔊';
-                btn.title = 'Звук: все';
-                btn.classList.add('on');
+                btn.textContent = '🔊'; btn.title = 'Звук: все'; btn.classList.add('on');
             }
         });
     },
-
     toggle() {
-        this.init();
-        this.mode = (this.mode + 1) % 3;
+        this.init(); this.mode = (this.mode + 1) % 3;
         const btn = document.getElementById('sndBtn');
         btn.textContent = ['🔇', '🔊', '🔔'][this.mode];
         btn.title = ['Звук: выкл', 'Звук: все', 'Звук: реалтайм'][this.mode];
@@ -698,7 +673,6 @@ const SND = {
         try { localStorage.setItem('atk_snd_mode', this.mode) } catch (e) {}
         if (this.mode === 1) this.transmit('ON', 'IPTables', false);
     },
-
     textToBits(text) {
         let bits = "";
         for (let i = 0; i < text.length; i++) {
@@ -706,16 +680,14 @@ const SND = {
         }
         return bits;
     },
-
     transmit(text, type = 'IPTables', isBg = false) {
-        if (this.mode === 0) return; // Выключено
-        if (isBg && this.mode === 2) return; // Только реалтайм
+        if (this.mode === 0) return;
+        if (isBg && this.mode === 2) return;
         if (!this.ctx) this.init();
         if (!this.ctx) return;
 
-        // Ставим звук в очередь
         this.queue = this.queue.then(() => new Promise(resolve => {
-            const safeText = String(text).substring(0, 16); // Защита от слишком длинных гудков
+            const safeText = String(text).substring(0, 16); 
             const bits = this.textToBits(safeText);
             const bitDuration = 1 / this.baudRate;
             const totalDuration = bits.length * bitDuration;
@@ -723,8 +695,7 @@ const SND = {
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
 
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
+            osc.connect(gain); gain.connect(this.ctx.destination);
 
             let f0 = 600, f1 = 1200;
             if (type === 'WAF') { f0 = 1800; f1 = 2800; }
@@ -746,39 +717,28 @@ const SND = {
                 const time = startTime + (i * bitDuration);
                 osc.frequency.setValueAtTime(bit === '1' ? f1 : f0, time);
             }
-
-            osc.start(startTime);
-            osc.stop(startTime + totalDuration);
-
+            osc.start(startTime); osc.stop(startTime + totalDuration);
             setTimeout(resolve, totalDuration * 1000 + 10);
         })).catch(() => {});
     },
-
     beepLive(ip) { this.transmit(ip || 'RT', 'IPTables', false); },
     beepBg(ip) { this.transmit(ip || 'BG', 'IPTables', true); }
 };
-window.SND = SND;
-SND.restore();
+window.SND = SND; SND.restore();
 
 const THEME={
-    current:'dark',
-    tileBase:null,
+    current:'dark', tileBase:null,
     init(){
-        let saved=null;
-        try{saved=localStorage.getItem('atk_theme')}catch(e){}
-        const def=window.DEFAULT_THEME||'dark';
-        this.current=saved||def;
-        this.apply();
+        let saved=null; try{saved=localStorage.getItem('atk_theme')}catch(e){}
+        const def=window.DEFAULT_THEME||'dark'; this.current=saved||def; this.apply();
     },
     toggle(){
         this.current=this.current==='dark'?'light':'dark';
-        try{localStorage.setItem('atk_theme',this.current)}catch(e){}
-        this.apply();
+        try{localStorage.setItem('atk_theme',this.current)}catch(e){} this.apply();
     },
     apply(){
         document.documentElement.setAttribute('data-theme',this.current);
-        const track=document.getElementById('themeTrack');
-        const ico=document.getElementById('themeIco');
+        const track=document.getElementById('themeTrack'), ico=document.getElementById('themeIco');
         if(track)track.classList.toggle('light',this.current==='light');
         if(ico)ico.textContent=this.current==='dark'?'🌙':'☀️';
         this.switchTiles();
@@ -786,20 +746,16 @@ const THEME={
     switchTiles(){
         if(typeof map==='undefined')return;
         if(!this.tileBase){
-            this.tileBase=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{
-                attribution:'Tiles &copy; Esri',
-                maxZoom:12});
+            this.tileBase=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri', maxZoom:12});
             this.tileBase.addTo(map);
         }
     }
 };
 window.THEME=THEME;
 (function(){
-    let saved=null;
-    try{saved=localStorage.getItem('atk_theme')}catch(e){}
+    let saved=null; try{saved=localStorage.getItem('atk_theme')}catch(e){}
     const def=window.DEFAULT_THEME||'dark';
-    const track=document.getElementById('themeTrack');
-    const ico=document.getElementById('themeIco');
+    const track=document.getElementById('themeTrack'), ico=document.getElementById('themeIco');
     const theme=saved||def;
     if(track)track.classList.toggle('light',theme==='light');
     if(ico)ico.textContent=theme==='dark'?'🌙':'☀️';
@@ -899,9 +855,7 @@ function addPt(lat,lon,ip,country,attacks,ports){
         const pArr = String(ports).split(',');
         if(pArr.length > 15) {
             pStr = pArr.slice(0, 15).join(', ') + ' <span style="color:var(--ora)">... (еще ' + (pArr.length - 15) + ')</span>';
-        } else {
-            pStr = pArr.join(', ');
-        }
+        } else { pStr = pArr.join(', '); }
         pStr = '<div style="margin-top:6px; font-size:8.5px; color:var(--dm); line-height:1.4;"><b>Порты:</b> ' + pStr + '</div>';
     }
 
@@ -909,8 +863,7 @@ function addPt(lat,lon,ip,country,attacks,ports){
     pM[ip]=m;
 }
 
-const logL=document.getElementById('logL');
-let logC=0;
+const logL=document.getElementById('logL'); let logC=0;
 function addLog(a,fr,type){
     const el=document.createElement('div');
     const cls=type==='ssh'?' ssh':type==='nc'?' nc':type==='waf'?' fr':(fr?' fr':'');
@@ -933,16 +886,14 @@ const PR={
 function makeBarChart(container, items, labelKey, valueKey, colors){
     const el=document.getElementById(container);if(!el)return;el.innerHTML='';
     if(!items||!items.length)return;
-    const cl=colors||CLR;
-    const mx=Math.max(...items.map(p=>+p[valueKey]||0),1);
+    const cl=colors||CLR; const mx=Math.max(...items.map(p=>+p[valueKey]||0),1);
     items.forEach((p,i)=>{const pc=(+p[valueKey]/mx)*100;
         el.innerHTML+='<div class="br"><span class="br-l" title="'+esc(p[labelKey])+'">'+esc(String(p[labelKey]).substring(0,8))+'</span><div class="br-t"><div class="br-f" style="width:'+pc+'%;background:'+cl[i%cl.length]+'"></div></div><span class="br-v" style="color:'+cl[i%cl.length]+'">'+fmt(p[valueKey])+'</span></div>'});
 }
 
 function makeSparkline(data, key, color){
     if(!data||!data.length)return '';
-    const vals=data.map(d=>+d[key]||0);
-    const mx=Math.max(...vals,0.01);
+    const vals=data.map(d=>+d[key]||0); const mx=Math.max(...vals,0.01);
     let html='<div class="spark">';
     const step=Math.max(1,Math.floor(vals.length/20));
     for(let i=0;i<vals.length;i+=step){
@@ -957,14 +908,12 @@ let lastTime=null;
 function animateCount(el,target){
     const cur=parseInt(el.textContent.replace(/\s/g,''))||0;
     if(cur>=target)return;
-    const diff=target-cur;
-    const steps=Math.min(diff,30);
+    const diff=target-cur; const steps=Math.min(diff,30);
     const perStep=Math.max(1,Math.floor(diff/steps));
     let v=cur,step=0;
     function tick(){
         v+=perStep;if(v>=target)v=target;
-        el.textContent=fmt(v);
-        step++;
+        el.textContent=fmt(v); step++;
         if(v<target&&step<steps)setTimeout(tick,50);
     }
     tick();
@@ -987,21 +936,16 @@ async function loadStats(){
         document.getElementById('si-t').textContent=fmt(s.total_drops);
         document.getElementById('si-b').textContent=fmt(s.total_bans);
         document.getElementById('si-ct').textContent=fmt(s.conntrack||0);
-        if(s.ram_used_mb&&s.ram_total_mb){
-            document.getElementById('si-ram').textContent=Math.round(s.ram_used_mb)+'/'+ Math.round(s.ram_total_mb)+'M';
-        }
+        if(s.ram_used_mb&&s.ram_total_mb){ document.getElementById('si-ram').textContent=Math.round(s.ram_used_mb)+'/'+ Math.round(s.ram_total_mb)+'M'; }
         document.getElementById('sInfo').innerHTML=
             sr('Сегодня',fmt(s.today_drops),'--red')+sr('Вчера',fmt(s.yesterday_drops),'--red')+
             sr('Неделя',fmt(s.week_drops),'--ora')+sr('Всего',fmt(s.total_drops),'--ora')+
             sr('IP сегодня',fmt(s.today_ips),'--cy')+sr('Банов сегодня',fmt(s.today_bans),'--pu')+
             sr('Банов всего',fmt(s.total_bans),'--pu')+sr('Nginx блок',fmt(s.nginx_blocks),'--yl')+
             sr('SSH атак',fmt(s.today_ssh||0),'--cy')+sr('NC auth',fmt(s.today_nc_auth||0),'--pu')+
-            sr('WAF блок',fmt(s.today_waf||0),'--ora')+
-            sr('IDS алерт',fmt(s.today_ids||0),'--pu')+
-            sr('CPU',s.cpu_temp?Math.round(s.cpu_temp)+'°C':'—','--gn')+
-            sr('Load',s.load_1m?s.load_1m.toFixed(2):'—','--yl')+
-            sr('Conntrack',fmt(s.conntrack||0),'--cy')+
-            sr('GeoIP',fmt(s.geo_cached),'--cy');
+            sr('WAF блок',fmt(s.today_waf||0),'--ora')+sr('IDS алерт',fmt(s.today_ids||0),'--pu')+
+            sr('CPU',s.cpu_temp?Math.round(s.cpu_temp)+'°C':'—','--gn')+sr('Load',s.load_1m?s.load_1m.toFixed(2):'—','--yl')+
+            sr('Conntrack',fmt(s.conntrack||0),'--cy')+sr('GeoIP',fmt(s.geo_cached),'--cy');
     }catch(e){console.error(e)}
 }
 function sr(l,v,c){return'<div class="sr"><span class="sr-l">'+l+'</span><span class="sr-v" style="color:var('+c+')">'+v+'</span></div>'}
@@ -1017,8 +961,7 @@ async function loadHourly(){
             const d2=new Date(now.getTime()-off*3600000);
             const y=d2.getFullYear(),mo=String(d2.getMonth()+1).padStart(2,'0'),da=String(d2.getDate()).padStart(2,'0'),hh=String(d2.getHours()).padStart(2,'0');
             const key=y+'-'+mo+'-'+da+' '+hh;
-            const v=hm[key]||0;
-            const p=Math.max(2,(v/mx)*100);
+            const v=hm[key]||0; const p=Math.max(2,(v/mx)*100);
             const b=document.createElement('div');b.className='hb';b.style.height=p+'%';
             if(off===0)b.style.background='var(--ora)';
             b.innerHTML='<div class="ht">'+d2.getHours()+':00 — '+fmt(v)+'</div>';
@@ -1076,8 +1019,7 @@ async function loadMetrics(){
             tc2.innerHTML=sr('°C',makeSparkline(d.temp,'temp','var(--red)'),'--red');
         } else tc2.innerHTML='<div class="sr"><span class="sr-l">Нет данных</span></div>';
 
-        document.getElementById('srvInfo').innerHTML=
-            sr('Интерфейс',NET_IF,'--cy')+sr('Интервал','60 сек','--dm')+sr('Хранение','3 мес','--dm');
+        document.getElementById('srvInfo').innerHTML=sr('Интерфейс','eth0','--cy')+sr('Интервал','60 сек','--dm')+sr('Хранение','3 мес','--dm');
     }catch(e){console.error(e)}
 }
 
@@ -1104,8 +1046,7 @@ const RTQ={
     process(){
         if(this.queue.length===0){this.processing=false;return}
         this.processing=true;
-        const batch=[...this.queue];
-        this.queue=[];
+        const batch=[...this.queue]; this.queue=[];
         const count=batch.length;
         const cfg=window.RT_CFG||{pollInterval:5000,minDelay:200};
         const maxDelay=cfg.pollInterval-500;
@@ -1115,33 +1056,20 @@ const RTQ={
         let idx=0;
         const showNext=()=>{
             if(idx>=batch.length){this.processing=false;return}
-            const item=batch[idx];
-            const x=item.attack;
+            const item=batch[idx], x=item.attack;
 
             addLog(x,item.rt,'ipt');
             if(x.lat&&x.lon){
                 const c=nc();
                 addPt(+x.lat,+x.lon,x.ip,x.country||'??',1,x.port);
-                if(item.rt){
-                    fireAtk([+x.lat,+x.lon],c);
-                    // Передаем в звук реальный IP!
-                    SND.beepLive(x.ip);
-                }
+                if(item.rt){ fireAtk([+x.lat,+x.lon],c); SND.beepLive(x.ip); }
             }
             idx++;
-            if(idx<batch.length){
-                this.timer=setTimeout(showNext, delay);
-            } else {
-                this.processing=false;
-            }
+            if(idx<batch.length){ this.timer=setTimeout(showNext, delay); } else { this.processing=false; }
         };
         showNext();
     },
-    clear(){
-        clearTimeout(this.timer);
-        this.queue=[];
-        this.processing=false;
-    }
+    clear(){ clearTimeout(this.timer); this.queue=[]; this.processing=false; }
 };
 
 async function pollAttacks(){
@@ -1152,14 +1080,10 @@ async function pollAttacks(){
         const cutoff=new Date(Date.now()+86400000);
         const cutStr=cutoff.getFullYear()+'-'+String(cutoff.getMonth()+1).padStart(2,'0')+'-'+String(cutoff.getDate()).padStart(2,'0');
         const valid=a.filter(x=>!x.time||x.time.slice(0,10)<=cutStr);
-
         const isRealtime = !!lastTime;
         const ts=valid.map(x=>x.time).filter(t=>t&&t.slice(0,10)<=cutStr);
         if(ts.length)lastTime=ts.reduce((a,b)=>a>b?a:b);
-
-        if(valid.length>0){
-            RTQ.enqueue(valid, isRealtime);
-        }
+        if(valid.length>0){ RTQ.enqueue(valid, isRealtime); }
     }catch(e){console.error(e)}
 }
 
@@ -1174,31 +1098,19 @@ const RP={
             catch(e){document.getElementById('rpI').textContent='Ошибка!';return}
         }
         this.playing=true;this.idx=0;
-        document.getElementById('rpB').classList.add('on');
-        document.getElementById('rpB').innerHTML='<span>⏸</span> Пауза';
-        document.getElementById('rpS').style.display='flex';
+        document.getElementById('rpB').classList.add('on'); document.getElementById('rpB').innerHTML='<span>⏸</span> Пауза'; document.getElementById('rpS').style.display='flex';
         this.next();
     },
     pause(){this.playing=false;clearTimeout(this.timer);
-        document.getElementById('rpB').innerHTML='<span>▶</span> Далее';
-        document.getElementById('rpB').classList.add('on')},
+        document.getElementById('rpB').innerHTML='<span>▶</span> Далее'; document.getElementById('rpB').classList.add('on')},
     stop(){this.playing=false;clearTimeout(this.timer);this.idx=0;
-        document.getElementById('rpB').innerHTML='<span>▶</span> Воспроизвести';
-        document.getElementById('rpB').classList.remove('on');
-        document.getElementById('rpS').style.display='none';
-        document.getElementById('rpF').style.width='0%';
-        document.getElementById('rpI').textContent='—'},
+        document.getElementById('rpB').innerHTML='<span>▶</span> Воспроизвести'; document.getElementById('rpB').classList.remove('on'); document.getElementById('rpS').style.display='none'; document.getElementById('rpF').style.width='0%'; document.getElementById('rpI').textContent='—'},
     next(){
         if(!this.playing||!this.data)return;
         if(this.idx>=this.data.length){this.stop();return}
         const a=this.data[this.idx];
-        if(a.lat&&a.lon){
-            fireAtk([+a.lat,+a.lon],nc());
-            addPt(+a.lat,+a.lon,a.ip,a.country||'??',1,a.port);
-            SND.beepBg(a.ip);
-        }
-        addLog(a,true);
-        this.idx++;
+        if(a.lat&&a.lon){ fireAtk([+a.lat,+a.lon],nc()); addPt(+a.lat,+a.lon,a.ip,a.country||'??',1,a.port); SND.beepBg(a.ip); }
+        addLog(a,true); this.idx++;
         document.getElementById('rpF').style.width=(this.idx/this.data.length*100)+'%';
         document.getElementById('rpI').textContent=this.idx+'/'+this.data.length;
         this.timer=setTimeout(()=>this.next(),Math.max(15,120/this.speeds[this.si]));
@@ -1210,20 +1122,13 @@ const RP={
 
 const BG={
     pts:null,idx:0,timer:null,active:false,
-    start(points){
-        this.pts=[...points].sort(()=>Math.random()-.5);
-        this.idx=0;
-        if(this.active)this.tick();
-    },
+    start(points){ this.pts=[...points].sort(()=>Math.random()-.5); this.idx=0; if(this.active)this.tick(); },
     tick(){
         if(!this.active||!this.pts||this.pts.length===0)return;
         const count=1+Math.floor(Math.random()*2);
         for(let i=0;i<count;i++){
             const p=this.pts[this.idx%this.pts.length];
-            if(p.lat&&p.lon){
-                fireAtk([+p.lat,+p.lon],nc());
-                SND.beepBg(p.ip);
-            }
+            if(p.lat&&p.lon){ fireAtk([+p.lat,+p.lon],nc()); SND.beepBg(p.ip); }
             this.idx++;
         }
         const delay=400+Math.random()*600;
@@ -1237,19 +1142,14 @@ const MODE={
     current:'rt',
     toggle(){
         if(this.current==='bg'){
-            this.current='rt';
-            BG.stop();
-            document.getElementById('modeBtn').innerHTML='<span>📡</span> Реалтайм';
-            document.getElementById('modeBtn').classList.remove('on');
+            this.current='rt'; BG.stop();
+            document.getElementById('modeBtn').innerHTML='<span>📡</span> Реалтайм'; document.getElementById('modeBtn').classList.remove('on');
         } else {
-            this.current='bg';
-            BG.resume();
-            document.getElementById('modeBtn').innerHTML='<span>🌐</span> Фон';
-            document.getElementById('modeBtn').classList.add('on');
+            this.current='bg'; BG.resume();
+            document.getElementById('modeBtn').innerHTML='<span>🌐</span> Фон'; document.getElementById('modeBtn').classList.add('on');
         }
     }
-};
-window.MODE=MODE;
+}; window.MODE=MODE;
 
 const DRAG = {
     init(panelId, defaultTop) {
@@ -1261,93 +1161,66 @@ const DRAG = {
         let isDragging = false;
         let startX, startY, initialX, initialY;
 
+        const updateBounds = () => {
+            let curX = parseInt(panel.style.left || 0);
+            let curY = parseInt(panel.style.top || defaultTop);
+            const maxX = window.innerWidth - panel.offsetWidth;
+            const maxY = window.innerHeight - panel.offsetHeight;
+            panel.style.left = Math.max(0, Math.min(curX, maxX)) + 'px';
+            panel.style.top = Math.max(0, Math.min(curY, maxY)) + 'px';
+        };
+
         try {
             const pos = JSON.parse(localStorage.getItem('atk_pos_' + panelId));
             if(pos && pos.l !== undefined && pos.t !== undefined) {
-                panel.style.left = pos.l + 'px';
-                panel.style.top = pos.t + 'px';
-            } else {
-                panel.style.top = defaultTop + 'px';
-                panel.style.left = '12px';
-            }
-        } catch(e){
-            panel.style.top = defaultTop + 'px';
-            panel.style.left = '12px';
-        }
+                panel.style.left = pos.l + 'px'; panel.style.top = pos.t + 'px';
+            } else { panel.style.top = defaultTop + 'px'; panel.style.left = '12px'; }
+        } catch(e){ panel.style.top = defaultTop + 'px'; panel.style.left = '12px'; }
+        
+        updateBounds();
 
         const onDown = (e) => {
             if(e.target.tagName === 'SPAN' || e.target.closest('span')) return;
             isDragging = true;
             const evt = e.touches ? e.touches[0] : e;
-            startX = evt.clientX;
-            startY = evt.clientY;
-
+            startX = evt.clientX; startY = evt.clientY;
             const rect = panel.getBoundingClientRect();
-            initialX = rect.left;
-            initialY = rect.top;
-
+            initialX = rect.left; initialY = rect.top;
             panel.style.transition = 'none';
-
             document.addEventListener(e.touches ? 'touchmove' : 'mousemove', onMove, {passive: false});
             document.addEventListener(e.touches ? 'touchend' : 'mouseup', onUp);
         };
 
         const onMove = (e) => {
-            if(!isDragging) return;
-            e.preventDefault();
+            if(!isDragging) return; e.preventDefault();
             const evt = e.touches ? e.touches[0] : e;
-            const dx = evt.clientX - startX;
-            const dy = evt.clientY - startY;
-
-            let newX = initialX + dx;
-            let newY = initialY + dy;
-
+            const dx = evt.clientX - startX, dy = evt.clientY - startY;
+            let newX = initialX + dx, newY = initialY + dy;
             newX = Math.max(0, Math.min(newX, window.innerWidth - panel.offsetWidth));
             newY = Math.max(0, Math.min(newY, window.innerHeight - panel.offsetHeight));
-
-            panel.style.left = newX + 'px';
-            panel.style.top = newY + 'px';
+            panel.style.left = newX + 'px'; panel.style.top = newY + 'px';
         };
 
         const onUp = () => {
-            if(!isDragging) return;
-            isDragging = false;
-            panel.style.transition = 'all .3s cubic-bezier(0.4, 0, 0.2, 1)';
-
-            try {
-                localStorage.setItem('atk_pos_' + panelId, JSON.stringify({
-                    l: parseInt(panel.style.left),
-                    t: parseInt(panel.style.top)
-                }));
-            } catch(e){}
-
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-            document.removeEventListener('touchmove', onMove);
-            document.removeEventListener('touchend', onUp);
+            if(!isDragging) return; isDragging = false;
+            panel.style.transition = 'max-height .3s cubic-bezier(0.4, 0, 0.2, 1)';
+            try { localStorage.setItem('atk_pos_' + panelId, JSON.stringify({ l: parseInt(panel.style.left), t: parseInt(panel.style.top) })); } catch(e){}
+            document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
+            document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onUp);
         };
 
-        header.addEventListener('mousedown', onDown);
-        header.addEventListener('touchstart', onDown, {passive: false});
+        header.addEventListener('mousedown', onDown); header.addEventListener('touchstart', onDown, {passive: false});
+        window.addEventListener('resize', updateBounds);
     }
 };
 
 const WAF={
     panel:null, body:null, cntEl:null, maxRows:30, collapsed:false,
-    init(){
-        this.panel=document.getElementById('wafPanel');
-        this.body=document.getElementById('wafBody');
-        this.cntEl=document.getElementById('wafCnt');
-    },
-    toggle(){
-        if(!this.panel)return;
-        this.collapsed=!this.collapsed;
-        this.panel.classList.toggle('collapsed',this.collapsed);
-    },
+    init(){ this.panel=document.getElementById('wafPanel'); this.body=document.getElementById('wafBody'); this.cntEl=document.getElementById('wafCnt'); },
+    toggle(){ if(!this.panel)return; this.collapsed=!this.collapsed; this.panel.classList.toggle('collapsed',this.collapsed); },
     addRow(w,isNew){
         if(!this.body)return;
-        const empty=this.body.querySelector('.waf-empty');
-        if(empty)empty.remove();
+        const empty=this.body.querySelector('.waf-empty'); if(empty)empty.remove();
 
         const el=document.createElement('div');
         el.className='waf-row'+(isNew?' new':'');
@@ -1361,45 +1234,23 @@ const WAF={
             '<span class="waf-row-info" title="'+esc(w.uri||'')+'">'+esc(uriShort)+' <span style="color:var(--dm)">'+esc(ruleShort)+'</span></span>'+
             '<span class="waf-row-time">'+tm+'</span>';
         this.body.insertBefore(el,this.body.firstChild);
-
         if(isNew) this.body.scrollTop=0;
         if(isNew) setTimeout(()=>{el.classList.remove('new')},8000);
-
-        while(this.body.children.length>this.maxRows){
-            this.body.removeChild(this.body.lastChild);
-        }
-
+        while(this.body.children.length>this.maxRows){ this.body.removeChild(this.body.lastChild); }
         if(isNew&&w.lat&&w.lon){
-            addPt(+w.lat,+w.lon,w.ip,w.country||'??',1,'WAF');
-            fireAtk([+w.lat,+w.lon],'#d97706');
-            // Передаем звук как WAF
-            SND.transmit(w.ip, 'WAF', false);
+            addPt(+w.lat,+w.lon,w.ip,w.country||'??',1,'WAF'); fireAtk([+w.lat,+w.lon],'#d97706'); SND.transmit(w.ip, 'WAF', false);
         }
-
-        if(isNew){
-            addLog({ip:w.ip,country:w.country||'??',port:'WAF:'+w.rule_id,time:w.time},true,'waf');
-        }
+        if(isNew){ addLog({ip:w.ip,country:w.country||'??',port:'WAF:'+w.rule_id,time:w.time},true,'waf'); }
     },
-    updateCount(n){
-        if(this.cntEl)this.cntEl.textContent=n;
-    }
-};
-window.WAF=WAF;
+    updateCount(n){ if(this.cntEl)this.cntEl.textContent=n; }
+}; window.WAF=WAF;
 
 let wafLastTime=null;
 async function pollWAF(){
     try{
-        let u=B+'?waf=1&limit=20';
-        if(wafLastTime)u+='&since='+encodeURIComponent(wafLastTime);
-        const d=await fj(u);
-        const attacks=d.attacks||[];
-
-        if(d.today!==undefined){
-            WAF.updateCount(d.today);
-            const el=document.getElementById('sv-waf');
-            if(el)animateCount(el,d.today);
-        }
-
+        let u=B+'?waf=1&limit=20'; if(wafLastTime)u+='&since='+encodeURIComponent(wafLastTime);
+        const d=await fj(u); const attacks=d.attacks||[];
+        if(d.today!==undefined){ WAF.updateCount(d.today); const el=document.getElementById('sv-waf'); if(el)animateCount(el,d.today); }
         const isRealtime=!!wafLastTime;
         if(attacks.length>0){
             const ts=attacks.map(x=>x.time).filter(Boolean);
@@ -1412,20 +1263,11 @@ async function pollWAF(){
 
 const IDS={
     panel:null, body:null, cntEl:null, maxRows:30, collapsed:false,
-    init(){
-        this.panel=document.getElementById('idsPanel');
-        this.body=document.getElementById('idsBody');
-        this.cntEl=document.getElementById('idsCnt');
-    },
-    toggle(){
-        if(!this.panel)return;
-        this.collapsed=!this.collapsed;
-        this.panel.classList.toggle('collapsed',this.collapsed);
-    },
+    init(){ this.panel=document.getElementById('idsPanel'); this.body=document.getElementById('idsBody'); this.cntEl=document.getElementById('idsCnt'); },
+    toggle(){ if(!this.panel)return; this.collapsed=!this.collapsed; this.panel.classList.toggle('collapsed',this.collapsed); },
     addRow(a,isNew){
         if(!this.body)return;
-        const empty=this.body.querySelector('.ids-empty');
-        if(empty)empty.remove();
+        const empty=this.body.querySelector('.ids-empty'); if(empty)empty.remove();
 
         const el=document.createElement('div');
         el.className='ids-row'+(isNew?' new':'');
@@ -1438,45 +1280,23 @@ const IDS={
             '<span class="ids-row-info" title="'+esc(a.sig_msg||'')+'"><b style="color:'+sevColor+'">'+esc(a.proto||'TCP')+'</b> :'+esc(a.port||'—')+' <span style="color:var(--dm)">'+esc(sigShort)+'</span></span>'+
             '<span class="ids-row-time">'+tm+'</span>';
         this.body.insertBefore(el,this.body.firstChild);
-
         if(isNew) this.body.scrollTop=0;
         if(isNew) setTimeout(()=>{el.classList.remove('new')},8000);
-
-        while(this.body.children.length>this.maxRows){
-            this.body.removeChild(this.body.lastChild);
-        }
-
+        while(this.body.children.length>this.maxRows){ this.body.removeChild(this.body.lastChild); }
         if(isNew&&a.lat&&a.lon){
-            addPt(+a.lat,+a.lon,a.ip,a.country||'??',1,'IDS:'+a.sig_id);
-            fireAtk([+a.lat,+a.lon],'#7e22ce');
-            // Передаем звук как IDS
-            SND.transmit(a.ip, 'IDS', false);
+            addPt(+a.lat,+a.lon,a.ip,a.country||'??',1,'IDS:'+a.sig_id); fireAtk([+a.lat,+a.lon],'#7e22ce'); SND.transmit(a.ip, 'IDS', false);
         }
-
-        if(isNew){
-            addLog({ip:a.ip,country:a.country||'??',port:'IDS:'+a.port,time:a.time},true,'ids');
-        }
+        if(isNew){ addLog({ip:a.ip,country:a.country||'??',port:'IDS:'+a.port,time:a.time},true,'ids'); }
     },
-    updateCount(n){
-        if(this.cntEl)this.cntEl.textContent=n;
-    }
-};
-window.IDS=IDS;
+    updateCount(n){ if(this.cntEl)this.cntEl.textContent=n; }
+}; window.IDS=IDS;
 
 let idsLastTime=null;
 async function pollIDS(){
     try{
-        let u=B+'?ids=1&limit=20';
-        if(idsLastTime)u+='&since='+encodeURIComponent(idsLastTime);
-        const d=await fj(u);
-        const attacks=d.attacks||[];
-
-        if(d.today!==undefined){
-            IDS.updateCount(d.today);
-            const el=document.getElementById('sv-ids');
-            if(el)animateCount(el,d.today);
-        }
-
+        let u=B+'?ids=1&limit=20'; if(idsLastTime)u+='&since='+encodeURIComponent(idsLastTime);
+        const d=await fj(u); const attacks=d.attacks||[];
+        if(d.today!==undefined){ IDS.updateCount(d.today); const el=document.getElementById('sv-ids'); if(el)animateCount(el,d.today); }
         const isRealtime=!!idsLastTime;
         if(attacks.length>0){
             const ts=attacks.map(x=>x.time).filter(Boolean);
@@ -1493,8 +1313,7 @@ async function pollIDS(){
     await Promise.all([loadCountries(),loadHourly(),loadPorts(),loadSSH()]);
     setL(85,'Атаки...');
 
-    WAF.init();
-    IDS.init();
+    WAF.init(); IDS.init();
 
     const wh = window.innerHeight;
     DRAG.init('idsPanel', wh > 800 ? wh - 600 : 250);
@@ -1508,7 +1327,6 @@ async function pollIDS(){
     setInterval(pollAttacks,cfg.pollInterval);setInterval(pollWAF,cfg.pollInterval);setInterval(pollIDS,cfg.pollInterval);setInterval(loadStats,cfg.statsRefresh);setInterval(()=>{loadCountries();loadHourly();loadPorts();loadSSH()},cfg.chartsRefresh);
 })();
 
-// Разрешаем звук по первому клику на любом месте документа
 document.body.addEventListener('click', () => { SND.init(); }, {once: true});
 
 })();
