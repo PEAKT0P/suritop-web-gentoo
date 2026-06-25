@@ -30,6 +30,11 @@ echo ""
 read -p "Commit message: " MSG
 git commit -m "$MSG"
 
-# 7. Push
+# 7. Push (use token from ~/tok.txt)
+TOKEN=$(cat ~/tok.txt 2>/dev/null)
+if [ -n "$TOKEN" ]; then
+    git remote set-url origin "https://PEAKT0P:${TOKEN}@github.com/PEAKT0P/suritop-web-gentoo.git"
+fi
 git push origin main
+git remote set-url origin https://github.com/PEAKT0P/suritop-web-gentoo.git
 echo "=== Done ==="
