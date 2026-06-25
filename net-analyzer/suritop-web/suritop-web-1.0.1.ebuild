@@ -81,7 +81,7 @@ src_install() {
 
 	insinto /var/www/suritop-web/htdocs/iptables
 	doins "${S}"/api.php
-	newins "${S}"/iptables_index.html index.html
+	doins "${S}"/index.html
 
 	insopts -m0644
 	insinto /etc/suritop-web
