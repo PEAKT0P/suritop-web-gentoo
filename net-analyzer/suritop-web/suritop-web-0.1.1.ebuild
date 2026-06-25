@@ -13,7 +13,7 @@ SRC_URI=""
 LICENSE="GPL-3"
 SLOT="0"
 KEYWORDS="amd64 x86"
-IUSE="+iptables nat docker +suricata geoip"
+IUSE="iptables nat docker suricata geoip"
 
 RDEPEND="
 	net-analyzer/suricata
@@ -107,7 +107,7 @@ src_install() {
 	newins "${S}"/suritop-web.conf suritop-web
 
 	insinto /etc/suritop-web
-	insopts -m0640
+	insopts -m0644
 	newins "${S}"/suritop.conf suritop.conf
 
 	newinitd "${S}"/suritop-stats.initd suritop-stats

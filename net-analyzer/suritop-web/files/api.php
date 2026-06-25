@@ -13,7 +13,7 @@ header('X-Frame-Options: DENY');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
 // ─── Конфигурация ───
-define('SOCKET_PATH', '/tmp/iptables-manager.sock');
+define('SOCKET_PATH', '/run/suritop-web/iptables-manager.sock');
 define('MAX_REQUEST_SIZE', 4096);
 define('SOCKET_TIMEOUT', 10);
 

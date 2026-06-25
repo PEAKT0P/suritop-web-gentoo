@@ -26,7 +26,7 @@ start() {
     fi
 
     # ── Source config ──
-    NET_IF="${SURITOP_NET_INTERFACE:-eth0}"
+    NET_IF="${SURITOP_NET_INTERFACE}"
     SSH_PORT="${SURITOP_SSH_PORT:-22}"
     SERVER_IP="${SURITOP_SERVER_IP:-127.0.0.1}"
     WHITELIST_IP="${SURITOP_WHITELIST_IP:-${SERVER_IP}}"
@@ -34,7 +34,13 @@ start() {
     DOCKER_ENABLE="${SURITOP_DOCKER_ENABLE:-no}"
     DOCKER_BRIDGE="${SURITOP_DOCKER_BRIDGE:-172.17.0.0/16}"
 
-    einfo "Interface: $NET_IF, SSH: $SSH_PORT, NAT: $NAT_ENABLE, Docker: $DOCKER_ENABLE"
+    if [ -z "$NET_IF" ]; then
+        ewarn "SURITOP_NET_INTERFACE is not set! Run: emerge --config net-analyzer/suritop-web"
+        eend 1
+        return 1
+    fi
+
+    einfo "Interface: $NET_IF, SSH: $SSH_PORT, NAT: $NAT_ENABLE, Docker: $Docker_ENABLE"
 
     # ==========================================
     # 1. ОЧИСТКА (IPv4 + IPv6)
@@ -70,11 +76,6 @@ start() {
     ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null
     ip6tables -A INPUT -p ipv6-icmp -j ACCEPT 2>/dev/null
     ip6tables -A INPUT -p tcp --dport $SSH_PORT -j ACCEPT 2>/dev/null
-    ip6tables -A INPUT -p udp --dport 30814:30821 -j ACCEPT 2>/dev/null
-    ip6tables -A INPUT -p tcp --dport 30814:30821 -j ACCEPT 2>/dev/null
-    ip6tables -A INPUT -p udp --dport 3478 -j ACCEPT 2>/dev/null
-    ip6tables -A INPUT -p tcp --dport 3478 -j ACCEPT 2>/dev/null
-    ip6tables -A INPUT -p tcp --dport 5349 -j ACCEPT 2>/dev/null
 
     # ==========================================
     # 4. WHITELIST — ВСЕГДА ПЕРВЫМ
@@ -107,16 +108,14 @@ start() {
     # 8. SYN_FLOOD CHECK
     # ==========================================
     iptables -N SYN_CHECK 2>/dev/null
-    # Не включаем автоматически — может ломать соединения
-    # iptables -A INPUT -p tcp --syn -j SYN_CHECK
     iptables -A SYN_CHECK -m limit --limit 1/second --limit-burst 3 -j RETURN
     iptables -A SYN_CHECK -j DROP
 
     # ==========================================
-    # 9. UDP_FLOOD CHECK (исключаем игровые порты)
+    # 9. UDP_FLOOD CHECK
     # ==========================================
     iptables -N UDP_CHECK 2>/dev/null
-    iptables -A INPUT -p udp ! --dport 30814:30821 -j UDP_CHECK
+    iptables -A INPUT -p udp -j UDP_CHECK
     iptables -A UDP_CHECK -m limit --limit 10/second -j RETURN
     iptables -A UDP_CHECK -j DROP
 
@@ -131,12 +130,7 @@ start() {
     iptables -A INPUT -i $NET_IF -p icmp --icmp-type echo-request -j DROP
 
     # ==========================================
-    # 12. БЛОКИРОВКА VNC 5900 ИЗ ИНТЕРНЕТА
-    # ==========================================
-    iptables -A INPUT -i $NET_IF -p tcp --dport 5900 -j DROP
-
-    # ==========================================
-    # 13. SSH ANTI-BRUTE-FORCE (recent module)
+    # 12. SSH ANTI-BRUTE-FORCE (recent module)
     # ==========================================
     iptables -A INPUT -p tcp --dport $SSH_PORT -m conntrack --ctstate NEW -m recent --name ssh_brute --set
     iptables -A INPUT -p tcp --dport $SSH_PORT -m conntrack --ctstate NEW -m recent --name ssh_brute --update --seconds 60 --hitcount 8 -j DROP
@@ -144,24 +138,15 @@ start() {
     iptables -A OUTPUT -p tcp --sport $SSH_PORT -j ACCEPT
 
     # ==========================================
-    # 14. LOКАЛКА br0 — ВЕСЬ ТРАФИК
-    # ==========================================
-    iptables -A INPUT -i br0 -j ACCEPT
-    iptables -A INPUT -i br0 -p udp --dport 67:68 --sport 67:68 -j ACCEPT
-
-    # ==========================================
-    # 15. DOCKER/BRIDGE — ВСТАВЛЯЕМ В САМЫЙ ВЕРХ
+    # 13. DOCKER/BRIDGE — ВСТАВЛЯЕМ В САМЫЙ ВЕРХ
     # ==========================================
     if [ "$DOCKER_ENABLE" = "yes" ]; then
         iptables -I INPUT 1 -i docker0 -j ACCEPT
         iptables -I INPUT 2 -s $DOCKER_BRIDGE -j ACCEPT
-        # Дополнительные Docker сети
-        iptables -I INPUT 3 -s 172.18.0.0/16 -j ACCEPT 2>/dev/null
-        iptables -I INPUT 4 -s 172.19.0.0/16 -j ACCEPT 2>/dev/null
     fi
 
     # ==========================================
-    # 16. NFQUEUE -> SURICATA IPS
+    # 14. NFQUEUE -> SURICATA IPS
     #    (Очищенный трафик уходит в Suricata)
     # ==========================================
     iptables -A INPUT -i $NET_IF -j NFQUEUE --queue-num 0 --queue-bypass
@@ -170,16 +155,14 @@ start() {
     iptables -A FORWARD -o $NET_IF -j NFQUEUE --queue-num 0 --queue-bypass
 
     # ==========================================
-    # 17. HTTP/HTTPS + СЕРВИСЫ
+    # 15. HTTP/HTTPS + СЕРВИСЫ
     #    (Suricata уже видит этот трафик через NFQUEUE)
     # ==========================================
     iptables -A INPUT -p tcp --dport 80 -j ACCEPT
     iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-    iptables -A INPUT -p udp --dport 30814:30821 -j ACCEPT
-    iptables -A INPUT -p tcp --dport 30814:30821 -j ACCEPT
 
     # ==========================================
-    # 18. DOCKER FORWARD
+    # 16. DOCKER FORWARD
     # ==========================================
     if [ "$DOCKER_ENABLE" = "yes" ]; then
         iptables -A FORWARD -i docker0 -j ACCEPT
@@ -191,16 +174,16 @@ start() {
     iptables -A FORWARD -i $NET_IF ! -o $NET_IF -j ACCEPT
 
     # ==========================================
-    # 19. LOG ДРОПНУТЫХ (в конце INPUT)
+    # 17. LOG ДРОПНУТЫХ (в конце INPUT)
     # ==========================================
     iptables -A INPUT -i $NET_IF -m limit --limit 5/min -j LOG --log-prefix "IPT-DROP: " --log-level 4
 
     # ==========================================
-    # 20. DOCKER-USER ИЗОЛЯЦИЯ
+    # 18. DOCKER-USER ИЗОЛЯЦИЯ
     # ==========================================
     if [ "$DOCKER_ENABLE" = "yes" ] && iptables -w -L DOCKER-USER -n &>/dev/null; then
         iptables -w -F DOCKER-USER
-        for port in 23 135 139 445 6379 11211 33060 5900 8080 3000 3389; do
+        for port in 23 135 139 445 6379 11211 33060 5900 3389; do
             iptables -w -A DOCKER-USER -i $NET_IF -p tcp --dport $port -j DROP
             iptables -w -A DOCKER-USER -i $NET_IF -p udp --dport $port -j DROP
         done
@@ -208,14 +191,14 @@ start() {
     fi
 
     # ==========================================
-    # 21. NAT / MASQUERADE
+    # 19. NAT / MASQUERADE
     # ==========================================
     if [ "$NAT_ENABLE" = "yes" ]; then
         iptables -t nat -A POSTROUTING -o $NET_IF -j MASQUERADE
     fi
 
     # ==========================================
-    # 22. MSS CLAMPING (MTU fix для VPN/NAT)
+    # 20. MSS CLAMPING (MTU fix для VPN/NAT)
     # ==========================================
     iptables -t mangle -A POSTROUTING -o $NET_IF -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 

@@ -42,7 +42,7 @@ vars:
     HTTP_PORTS: "80"
     SHELLCODE_PORTS: "!80"
     ORACLE_PORTS: 1521
-    SSH_PORTS: 22
+    SSH_PORTS: @@SSH_PORT@@
     DNP3_PORTS: 20000
     MODBUS_PORTS: 502
     FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
@@ -626,14 +626,14 @@ af-packet:
     ring-size: 50000       # <-- ДОБАВЛЯЕМ: увеличиваем буфер в памяти, чтобы не было kernel_drops
     threads: auto          # <-- ДОБАВЛЯЕМ: раскидываем обработку на все ядра процессора
 
-  - interface: br0
+  - interface: @@NET_INTERFACE@@
     cluster-id: 98
     cluster-type: cluster_flow
     tpacket-v3: yes
     use-mmap: yes
     defrag: yes
-    ring-size: 50000       # <-- ДОБАВЛЯЕМ
-    threads: auto          # <-- ДОБАВЛЯЕМ
+    ring-size: 50000
+    threads: auto
 
 #af-packet:
 #  - interface: enp6s0

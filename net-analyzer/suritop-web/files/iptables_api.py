@@ -27,9 +27,9 @@ _cfg = get_config()
 NET_IF = _cfg.get('net_interface', 'eth0')
 
 # ─── Конфигурация ───
-SOCKET_PATH = "/tmp/iptables-manager.sock"
+SOCKET_PATH = "/run/suritop-web/iptables-manager.sock"
 CACHE_TTL = 10  # секунд между обновлениями кэша
-PID_FILE = "/tmp/iptables-manager.pid"
+PID_FILE = "/run/suritop-web/iptables-manager.pid"
 LOG_FILE = "/var/log/iptables-manager.log"
 
 # Белый список команд для управления правилами
@@ -359,7 +359,7 @@ def get_suricata_info():
     """Базовая информация о Suricata"""
     info = {"running": False, "stats": {}}
 
-    pid = run_cmd("pgrep -f /usr/bin/suricata 2>/dev/null")
+    pid = run_cmd("pgrep -x suricata 2>/dev/null")
     info["running"] = bool(pid.strip())
 
     # Последние алерты
@@ -674,13 +674,15 @@ def main():
     os.chmod(SOCKET_PATH, 0o660)
 
     # Даём доступ nginx/php-fpm
-    # Группа nginx должна иметь доступ к сокету
-    try:
-        import grp
-        nginx_gid = grp.getgrnam("nginx").gr_gid
-        os.chown(SOCKET_PATH, 0, nginx_gid)
-    except:
-        # Если нет группы nginx, ставим 666
+    for grp_name in ("nginx", "www-data", "http"):
+        try:
+            import grp
+            gid = grp.getgrnam(grp_name).gr_gid
+            os.chown(SOCKET_PATH, 0, gid)
+            break
+        except (KeyError, ImportError):
+            continue
+    else:
         os.chmod(SOCKET_PATH, 0o666)
 
     log(f"Started on {SOCKET_PATH} (PID: {os.getpid()})")

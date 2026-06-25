@@ -1,6 +1,6 @@
 <?php
 /**
- * /var/www/router.denjik.ru/htdocs/attack_map.php  v9.1 (Design v3.2 Fixed Dark Map)
+ * /var/www/suritop-web/htdocs/attackmap/index.php  v9.3
  * Карта атак — реалтайм + воспроизведение (с кешем)
  * v8: UI V3 — Glassmorphism, Топографическая тема
  * v9: Fixes — Драг-н-дроп панелей, фикс тултипов
@@ -8,7 +8,7 @@
  * v9.2: CYBER RADIO INTEGRATION — Сонификация трафика (FSK модуляция)
  */
 
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/config.php';
 
 function getStatsDB() {
     static $pdo = null;
@@ -431,7 +431,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--tx);font-famil
 .ids-pnl-body::-webkit-scrollbar-thumb{background:rgba(175,82,222,.3);border-radius:4px}
 
 .waf-row, .ids-row{display:grid; grid-template-columns:100px 1fr 50px; gap:6px; padding:6px 12px; font-size:9.5px; align-items:center; animation: rowIn .3s ease-out;}
-.waf-row{border-bottom:1px solid rgba(255,149,0,.08);}
+.waf-row{grid-template-columns:100px 120px 1fr 50px; border-bottom:1px solid rgba(255,149,0,.08);}
 .ids-row{border-bottom:1px solid rgba(175,82,222,.08);}
 .waf-row:hover{background:rgba(255,149,0,.08)}
 .ids-row:hover{background:rgba(175,82,222,.08)}
@@ -656,7 +656,7 @@ window.DEFAULT_THEME='<?php echo defined('DEFAULT_THEME') ? DEFAULT_THEME : 'dar
 (function(){
 'use strict';
 
-const MSK=[55.7558,37.6173],B='<?= ATTACKMAP_BASE_URL ?>';
+const SERVER_CENTER=[<?php echo defined('SERVER_LAT') ? SERVER_LAT : 0; ?>,<?php echo defined('SERVER_LON') ? SERVER_LON : 0; ?>],B='<?= ATTACKMAP_BASE_URL ?>';
 const CLR=['#dc2626','#ea580c','#d97706','#ca8a04','#0284c7','#7e22ce','#be185d','#16a34a','#ef4444','#f97316'];
 let ci=0;function nc(){return CLR[ci++%CLR.length]}
 
@@ -813,13 +813,13 @@ const lBar=document.getElementById('lBar'),lSt=document.getElementById('lSt');
 function setL(p,t){lBar.style.width=p+'%';lSt.textContent=t}
 
 setL(5,'Карта...');
-const map=L.map('map',{center:[35,50],zoom:3,minZoom:2,maxZoom:12,zoomControl:true,preferCanvas:true});
+const map=L.map('map',{center:SERVER_CENTER,zoom:3,minZoom:2,maxZoom:12,zoomControl:true,preferCanvas:true});
 THEME.switchTiles();
 
 requestAnimationFrame(()=>{document.querySelectorAll('.leaflet-attribution-flag').forEach(e=>e.remove());const a=document.querySelector('.leaflet-control-attribution');if(a)a.innerHTML=a.innerHTML.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi,'').replace(/<img[^>]*>/gi,'')});
 
 document.head.appendChild(Object.assign(document.createElement('style'),{textContent:'@keyframes mP{0%{transform:scale(.5);opacity:1}100%{transform:scale(2.5);opacity:0}}@-webkit-keyframes mP{0%{-webkit-transform:scale(.5);opacity:1}100%{-webkit-transform:scale(2.5);opacity:0}}'}));
-L.marker(MSK,{icon:L.divIcon({className:'',html:'<div style="position:relative;width:24px;height:24px"><div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center"><div style="width:8px;height:8px;background:var(--red);border-radius:50%;box-shadow:0 0 10px rgba(220,38,38,.8),0 0 25px rgba(220,38,38,.5);z-index:3"></div></div><div style="position:absolute;top:0;right:0;bottom:0;left:0;border:2px solid rgba(220,38,38,.6);border-radius:50%;-webkit-animation:mP 2s ease-out infinite;animation:mP 2s ease-out infinite"></div><div style="position:absolute;top:-4px;right:-4px;bottom:-4px;left:-4px;border:1px solid rgba(220,38,38,.2);border-radius:50%;-webkit-animation:mP 2s ease-out .8s infinite;animation:mP 2s ease-out .8s infinite"></div></div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:1000}).addTo(map).bindTooltip('МОСКВА — ЗАЩИТА',{permanent:false,direction:'top',className:'msk-tip',offset:[0,-14]});
+L.marker(SERVER_CENTER,{icon:L.divIcon({className:'',html:'<div style="position:relative;width:24px;height:24px"><div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center"><div style="width:8px;height:8px;background:var(--red);border-radius:50%;box-shadow:0 0 10px rgba(220,38,38,.8),0 0 25px rgba(220,38,38,.5);z-index:3"></div></div><div style="position:absolute;top:0;right:0;bottom:0;left:0;border:2px solid rgba(220,38,38,.6);border-radius:50%;-webkit-animation:mP 2s ease-out infinite;animation:mP 2s ease-out infinite"></div><div style="position:absolute;top:-4px;right:-4px;bottom:-4px;left:-4px;border:1px solid rgba(220,38,38,.2);border-radius:50%;-webkit-animation:mP 2s ease-out .8s infinite;animation:mP 2s ease-out .8s infinite"></div></div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:1000}).addTo(map).bindTooltip('SERVER',{permanent:false,direction:'top',className:'msk-tip',offset:[0,-14]});
 
 setL(15,'Карта ОК');
 
@@ -842,7 +842,7 @@ function fireAtk(fromLL,color){
 
 function tickCanvas(){
     ctx.clearRect(0,0,cvs.width,cvs.height);
-    const msk=ll2px(MSK);
+    const msk=ll2px(SERVER_CENTER);
 
     for(let i=arcs.length-1;i>=0;i--){
         const a=arcs[i];a.t+=a.sp;
@@ -1354,9 +1354,11 @@ const WAF={
         const tm=w.time?new Date(w.time.replace(' ','T')).toLocaleTimeString('ru-RU'):'';
         const uriShort=(w.uri||'/').substring(0,40);
         const ruleShort=(w.rule_msg||'').substring(0,35);
+        const hostShort=(w.host||'').replace('www.','').substring(0,20);
         el.innerHTML=
             '<span class="waf-row-ip" title="'+esc(w.ip)+'">'+esc(w.ip)+'</span>'+
-            '<span class="waf-row-info" title="'+esc(w.uri||'')+'"><b>'+esc(w.method||'GET')+'</b> '+esc(uriShort)+' <span style="color:var(--dm)">'+esc(ruleShort)+'</span></span>'+
+            '<span class="waf-row-info" title="'+esc(w.host||'')+'"><b>'+esc(w.method||'GET')+'</b> '+esc(hostShort)+'</span>'+
+            '<span class="waf-row-info" title="'+esc(w.uri||'')+'">'+esc(uriShort)+' <span style="color:var(--dm)">'+esc(ruleShort)+'</span></span>'+
             '<span class="waf-row-time">'+tm+'</span>';
         this.body.insertBefore(el,this.body.firstChild);
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 suritop_config.py — Shared configuration reader for suritop-web
-Reads from /etc/suritop-web/collector.conf and /etc/conf.d/suritop-web
+Reads from /etc/suritop-web/suritop.conf (INI format, single source of truth)
 
 Usage in other scripts:
     from suritop_config import get_db, get_config
@@ -12,32 +12,20 @@ Usage in other scripts:
 import os
 import configparser
 
-CONFIG_PATH = '/etc/suritop-web/collector.conf'
-CONFD_PATH = '/etc/conf.d/suritop-web'
+CONFIG_PATH = '/etc/suritop-web/suritop.conf'
 
 _config = None
-_env_loaded = False
 
 
-def _load_env():
-    """Load /etc/conf.d/suritop-web into os.environ"""
-    global _env_loaded
-    if _env_loaded:
-        return
-    _env_loaded = True
-    if os.path.exists(CONFD_PATH):
-        with open(CONFD_PATH, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, _, val = line.partition('=')
-                    key = key.strip()
-                    val = val.strip().strip('"').strip("'")
-                    if val.startswith('"') and val.endswith('"'):
-                        val = val[1:-1]
-                    if val.startswith("'") and val.endswith("'"):
-                        val = val[1:-1]
-                    os.environ.setdefault(key, val)
+def _get_int(conf, section, option, default):
+    """Get int value, handle @@ placeholders gracefully"""
+    try:
+        val = conf.get(section, option, fallback=str(default))
+        if '@@' in val:
+            return default
+        return int(val)
+    except (ValueError, TypeError):
+        return default
 
 
 def get_config():
@@ -46,28 +34,26 @@ def get_config():
     if _config is not None:
         return _config
 
-    _load_env()
-
     conf = configparser.ConfigParser()
     conf.read(CONFIG_PATH)
 
     _config = {
-        'db_host': os.environ.get('SURITOP_DB_HOST',
-                    conf.get('Database', 'host', fallback='localhost')),
-        'db_name': os.environ.get('SURITOP_DB_NAME',
-                    conf.get('Database', 'name', fallback='server_stats')),
-        'db_user_r': os.environ.get('SURITOP_DB_USER_R',
-                     conf.get('Database', 'user_r', fallback='stats_reader')),
-        'db_pass_r': os.environ.get('SURITOP_DB_PASS_R',
-                     conf.get('Database', 'pass_r', fallback='')),
-        'db_user_w': os.environ.get('SURITOP_DB_USER_W',
-                     conf.get('Database', 'user_w', fallback='stats_writer')),
-        'db_pass_w': os.environ.get('SURITOP_DB_PASS_W',
-                     conf.get('Database', 'pass_w', fallback='')),
-        'our_ip': os.environ.get('SURITOP_SERVER_IP',
-                  conf.get('Network', 'our_ip', fallback='127.0.0.1')),
-        'net_interface': os.environ.get('SURITOP_NET_INTERFACE',
-                         conf.get('Interfaces', 'monitor', fallback='eth0')),
+        'db_host': conf.get('Database', 'host', fallback='localhost'),
+        'db_name': conf.get('Database', 'name', fallback='server_stats'),
+        'db_user_r': conf.get('Database', 'user_r', fallback='stats_reader'),
+        'db_pass_r': conf.get('Database', 'pass_r', fallback=''),
+        'db_user_w': conf.get('Database', 'user_w', fallback='stats_writer'),
+        'db_pass_w': conf.get('Database', 'pass_w', fallback=''),
+        'our_ip': conf.get('Network', 'our_ip', fallback='127.0.0.1'),
+        'net_interface': conf.get('Network', 'interface', fallback=''),
+        'ssh_port': _get_int(conf, 'Network', 'ssh_port', 22),
+        'whitelist_ip': conf.get('Network', 'whitelist_ip', fallback=''),
+        'home_net': conf.get('Network', 'home_net', fallback=''),
+        'server_lat': conf.getfloat('Network', 'server_lat', fallback=55.75),
+        'server_lon': conf.getfloat('Network', 'server_lon', fallback=37.62),
+        'docker_enable': conf.get('Docker', 'enable', fallback='no'),
+        'docker_bridge': conf.get('Docker', 'bridge', fallback='172.17.0.0/16'),
+        'nat_enable': conf.get('NAT', 'enable', fallback='no'),
     }
     return _config
 

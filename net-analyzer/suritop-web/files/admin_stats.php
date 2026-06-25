@@ -1,7 +1,7 @@
 <?php
 /**
- * /var/www/router.denjik.ru/htdocs/admin_stats.php
- * v3.2 - Pure Data Edition + API Ban Integration (No Map, No Sound)
+ * /var/www/suritop-web/htdocs/admin_stats.php
+ * v3.3 - Pure Data Edition + API Ban Integration
  */
 require_once __DIR__ . '/config.php';
 

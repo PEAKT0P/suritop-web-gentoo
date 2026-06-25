@@ -4,27 +4,22 @@ suritop v4 — Suricata IDS + ModSecurity WAF Monitor
 Matrix/Cyber theme with noise filtering and detail view.
 
 Launch: suritop
-Keys:   q/Esc=quit  p=pause  c=clear  f=filter  d=detail
+Keys:   q/Esc=quit  p=pause  c=clear  f=filter  d:detail
         1-3=sort  ↑↓=scroll  TAB=cycle panels
         PgUp/PgDn=fast scroll  Home=top
 """
 
 import sys
-import curses
 sys.path.insert(0, '/opt/stats_collector')
 from suritop_config import get_config
 import json
 import os
 import time
-import configparser
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 
-# ── Читаем конфиг ──
-config = configparser.ConfigParser()
-config.read('/opt/stats_collector/collector.conf')
-# Берем IP, а если файла нет или там ошибка — используем старый IP как запасной
-OUR_IP = config.get('Network', 'our_ip', fallback='127.0.0.1')
+_cfg = get_config()
+OUR_IP = _cfg['our_ip']
 
 EVE_LOG = '/var/log/suricata/eve.json'
 MAX_ALERTS = 500
@@ -43,7 +38,6 @@ SKIP_PREFIXES = [
     'ET INFO Observed DNS Query to vk.com',
 ]
 def _get_local_ips():
-    """Определяем локальные IP динамически"""
     ips = {OUR_IP}
     try:
         import socket
@@ -52,7 +46,6 @@ def _get_local_ips():
         ips.add(local_ip)
     except Exception:
         pass
-    # Добавляем все адреса основного интерфейса
     try:
         import netifaces
         for iface in netifaces.interfaces():
@@ -61,17 +54,14 @@ def _get_local_ips():
                 ips.add(a['addr'])
     except ImportError:
         pass
-    # Добавляем стандартные приватные подсети шлюзов
-    ips.update({'10.0.0.1', '172.16.0.1', '192.168.0.1'})
     return ips
 
 LOCAL_IPS = _get_local_ips()
 
-_db_cfg = get_config()
-DB_HOST = _db_cfg["db_host"]
-DB_USER = _db_cfg["db_user_w"]
-DB_PASS = _db_cfg["db_pass_w"]
-DB_NAME = _db_cfg["db_name"]
+DB_HOST = _cfg["db_host"]
+DB_USER = _cfg["db_user_w"]
+DB_PASS = _cfg["db_pass_w"]
+DB_NAME = _cfg["db_name"]
 
 try:
     import MySQLdb; HAS_MYSQL=True
@@ -325,7 +315,6 @@ class SuriTop:
 
     def _layout(self,scr,h,w):
         ba=curses.color_pair(C_BORDER)
-        # Top bar with dot pattern
         for i in range(w):
             self._s(scr,0,i,DOT_H if i%2==0 else BOX_H,ba)
         title="SURITOP — IDS + WAF Monitor"
@@ -493,6 +482,7 @@ class SuriTop:
             self._s(scr,row,px+2+len(lbl)+1,val[:iw-len(lbl)-1],dc|curses.A_BOLD)
 
 def main():
+    import curses
     term=os.environ.get('TERM','')
     if '256color' not in term and term in('xterm','screen','tmux','rxvt','linux'):
         os.environ['TERM']=term+'-256color'

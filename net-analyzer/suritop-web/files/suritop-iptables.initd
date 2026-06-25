@@ -9,7 +9,7 @@ command_args="/opt/iptables-manager/iptables_api.py"
 command_background="yes"
 command_user="root:root"
 
-pidfile="/tmp/iptables-manager.pid"
+pidfile="/run/suritop-web/iptables-manager.pid"
 start_stop_daemon_args="--make-pidfile --stdout /var/log/iptables-manager.log --stderr /var/log/iptables-manager.log"
 
 depend() {
@@ -19,14 +19,18 @@ depend() {
 }
 
 start_pre() {
+    checkpath --directory --owner root:root --mode 0755 /run/suritop-web
     checkpath --file --owner root:root --mode 0644 /var/log/iptables-manager.log 2>/dev/null || true
-    # Kill stale iptables-manager from old init.d
-    if [ -f /run/suritop-web/iptables-manager.pid ]; then
-        kill $(cat /run/suritop-web/iptables-manager.pid) 2>/dev/null
-        rm -f /run/suritop-web/iptables-manager.pid
-    fi
+    # Clean stale state
+    rm -f /run/suritop-web/iptables-manager.sock
+    [ -f /run/suritop-web/iptables-manager.pid ] && kill $(cat /run/suritop-web/iptables-manager.pid) 2>/dev/null
+    rm -f /run/suritop-web/iptables-manager.pid
+    # Also clean old /tmp location
+    [ -f /tmp/iptables-manager.pid ] && kill $(cat /tmp/iptables-manager.pid) 2>/dev/null
+    rm -f /tmp/iptables-manager.sock /tmp/iptables-manager.pid
 }
 
 stop_post() {
-    [ -S /tmp/iptables-manager.sock ] && rm -f /tmp/iptables-manager.sock
+    [ -S /run/suritop-web/iptables-manager.sock ] && rm -f /run/suritop-web/iptables-manager.sock
+    [ -f /run/suritop-web/iptables-manager.pid ] && rm -f /run/suritop-web/iptables-manager.pid
 }

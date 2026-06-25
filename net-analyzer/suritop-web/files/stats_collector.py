@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-stats_collector.py v2 — Демон сбора логов блокировок + системных метрик в MySQL
+stats_collector.py v3 — Демон сбора логов блокировок + системных метрик в MySQL
 Плюс дублирует все атаки (Nginx, SSH, Nextcloud) в ipt_drops для графиков PHP.
 Запускается через OpenRC, работает под пользователем stats_collector
 """
@@ -16,7 +16,6 @@ from pathlib import Path
 from collections import deque
 from utils import LogTailer
 
-# ── Конфигурация ──
 from suritop_config import get_config
 
 _cfg = get_config()
@@ -32,21 +31,27 @@ METRICS_INTERVAL = 60
 BATCH_SIZE = 500
 
 NET_INTERFACE = _cfg['net_interface']
-NEXTCLOUD_LOG = '/media/nextcloud/nextcloud/nextcloud.log'
 
 MONITORED_FILES = {
     'messages': f'{LOG_DIR}/messages',
     'fail2ban': f'{LOG_DIR}/fail2ban.log',
 }
 
-NGINX_ACCESS_LOGS = [
-    'ssl_access_denjik_.ru.log',
-    'ssl_access_kamchatka360_ru.log',
-    'ssl_access_bez-kluchei-rf.log',
-    'ssl_access_yana_denjik_ru.log',
-    'ssl_access_pnevmo_denjik_ru.log',
-    'access.log',
-]
+
+def discover_nginx_logs():
+    """Автоматически находит все access логи nginx"""
+    logs = []
+    if not os.path.isdir(NGINX_LOG_DIR):
+        return logs
+    for f in sorted(os.listdir(NGINX_LOG_DIR)):
+        if 'access' in f and f.endswith('.log'):
+            logs.append(f)
+    if 'access.log' not in logs and os.path.exists(os.path.join(NGINX_LOG_DIR, 'access.log')):
+        logs.append('access.log')
+    return logs
+
+
+NGINX_ACCESS_LOGS = discover_nginx_logs()
 
 RE_IPT_DROP = re.compile(
     r'(\w+\s+\d+\s+[\d:]+)\s+\S+\s+kernel:\s+IPT-DROP:.*'
@@ -87,7 +92,6 @@ ipt_buffer = deque()
 f2b_buffer = deque()
 nginx_buffer = deque()
 ssh_buffer = deque()
-nc_auth_buffer = deque()
 running = True
 
 
@@ -217,55 +221,6 @@ def process_nginx_access(lines, log_name):
                     logged_at
                 ))
 
-def process_nextcloud_log(lines):
-    import json
-    for line in lines:
-        try:
-            entry = json.loads(line)
-        except (json.JSONDecodeError, ValueError):
-            continue
-
-        message = entry.get('message', '')
-        level = entry.get('level', 0)
-
-        if level < 2:
-            continue
-
-        is_auth = False
-        event_type = None
-
-        if 'Login failed' in message or 'Failed login' in message:
-            is_auth = True
-            event_type = 'login_failed'
-        elif 'Bruteforce' in message:
-            is_auth = True
-            event_type = 'bruteforce'
-        elif 'Invalid credentials' in message:
-            is_auth = True
-            event_type = 'invalid_credentials'
-        elif 'Throttle' in message.lower() and 'bruteforce' in message.lower():
-            is_auth = True
-            event_type = 'bruteforce_throttle'
-
-        if is_auth:
-            remote = entry.get('remoteAddr', '') or entry.get('remote', '') or ''
-            user = entry.get('user', '') or entry.get('uid', '') or ''
-            time_str = entry.get('time', '')
-
-            try:
-                logged_at = datetime.strptime(time_str[:19], '%Y-%m-%dT%H:%M:%S')
-            except Exception:
-                logged_at = datetime.now()
-
-            if remote:
-                nc_auth_buffer.append((
-                    remote[:45],
-                    user[:100],
-                    event_type,
-                    message[:500],
-                    logged_at
-                ))
-
 def get_cpu_temp():
     for hwmon in Path('/sys/class/hwmon/').glob('hwmon*'):
         for temp_input in hwmon.glob('temp*_input'):
@@ -345,7 +300,6 @@ def flush_to_db(conn):
     flushed = 0
 
     try:
-        # 1. IPT drops (Они и так пишутся в ipt_drops)
         if ipt_buffer:
             batch = []
             while ipt_buffer and len(batch) < BATCH_SIZE:
@@ -357,7 +311,6 @@ def flush_to_db(conn):
                 )
                 flushed += len(batch)
 
-        # 2. F2B actions
         if f2b_buffer:
             batch = []
             while f2b_buffer and len(batch) < BATCH_SIZE:
@@ -369,7 +322,6 @@ def flush_to_db(conn):
                 )
                 flushed += len(batch)
 
-        # 3. Nginx blocks (Дублируем в ipt_drops)
         if nginx_buffer:
             batch = []
             while nginx_buffer and len(batch) < BATCH_SIZE:
@@ -380,12 +332,10 @@ def flush_to_db(conn):
                     "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                     batch
                 )
-                # b[0]=src_ip, b[6]=logged_at. Эмулируем dst_port 443, proto TCP
                 ipt_batch = [(b[0], 443, 'TCP', b[6]) for b in batch]
                 cur.executemany("INSERT INTO ipt_drops (src_ip, dst_port, proto, logged_at) VALUES (%s, %s, %s, %s)", ipt_batch)
                 flushed += len(batch)
 
-        # 4. SSH bruteforce (Дублируем в ipt_drops)
         if ssh_buffer:
             batch = []
             while ssh_buffer and len(batch) < BATCH_SIZE:
@@ -396,24 +346,7 @@ def flush_to_db(conn):
                     "VALUES (%s, %s, %s, %s)",
                     batch
                 )
-                # b[0]=src_ip, b[3]=logged_at. Эмулируем dst_port 22, proto TCP
                 ipt_batch = [(b[0], 22, 'TCP', b[3]) for b in batch]
-                cur.executemany("INSERT INTO ipt_drops (src_ip, dst_port, proto, logged_at) VALUES (%s, %s, %s, %s)", ipt_batch)
-                flushed += len(batch)
-
-        # 5. Nextcloud auth failures (Дублируем в ipt_drops)
-        if nc_auth_buffer:
-            batch = []
-            while nc_auth_buffer and len(batch) < BATCH_SIZE:
-                batch.append(nc_auth_buffer.popleft())
-            if batch:
-                cur.executemany(
-                    "INSERT INTO nc_auth_fails (src_ip, username, event_type, message, logged_at) "
-                    "VALUES (%s, %s, %s, %s, %s)",
-                    batch
-                )
-                # b[0]=src_ip, b[4]=logged_at. Эмулируем dst_port 443, proto TCP
-                ipt_batch = [(b[0], 443, 'TCP', b[4]) for b in batch]
                 cur.executemany("INSERT INTO ipt_drops (src_ip, dst_port, proto, logged_at) VALUES (%s, %s, %s, %s)", ipt_batch)
                 flushed += len(batch)
 
@@ -481,7 +414,7 @@ def record_metrics(conn, prev_net):
 def cleanup_old_data(conn):
     try:
         cur = conn.cursor()
-        tables_6m = ['ipt_drops', 'f2b_actions', 'nginx_blocks', 'ssh_attacks', 'nc_auth_fails']
+        tables_6m = ['ipt_drops', 'f2b_actions', 'nginx_blocks', 'ssh_attacks']
         for table in tables_6m:
             cur.execute(f"DELETE FROM {table} WHERE logged_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)")
 
@@ -490,7 +423,7 @@ def cleanup_old_data(conn):
             col = 'recorded_at'
             cur.execute(f"DELETE FROM {table} WHERE {col} < DATE_SUB(NOW(), INTERVAL 3 MONTH)")
 
-        cur.execute("DELETE FROM geoip_cache WHERE cached_at < DATE_SUB(NOW(), INTERVAL 30 DAY)")
+        cur.execute("DELETE FROM geo_cache WHERE updated_at < DATE_SUB(NOW(), INTERVAL 30 DAY)")
         conn.commit()
         logging.info("Old data cleanup done")
     except Exception as e:
@@ -505,7 +438,7 @@ def main():
     global running
 
     setup_logging()
-    logging.info("Stats collector v2 starting...")
+    logging.info("Stats collector v3 starting...")
 
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
@@ -514,27 +447,27 @@ def main():
     tailers = {}
 
     for name, path in MONITORED_FILES.items():
-        state_file = os.path.join(STATE_DIR, f'{name}.pos')
-        tailers[name] = LogTailer(path, state_file)
+        if os.path.exists(path):
+            state_file = os.path.join(STATE_DIR, f'{name}.pos')
+            tailers[name] = LogTailer(path, state_file)
 
     nginx_tailers = {}
     for log_name in NGINX_ACCESS_LOGS:
         log_path = os.path.join(NGINX_LOG_DIR, log_name)
-        state_file = os.path.join(STATE_DIR, f'nginx_{log_name}.pos')
-        nginx_tailers[log_name] = LogTailer(log_path, state_file)
+        if os.path.exists(log_path):
+            state_file = os.path.join(STATE_DIR, f'nginx_{log_name}.pos')
+            nginx_tailers[log_name] = LogTailer(log_path, state_file)
+            logging.info(f"Monitoring nginx log: {log_name}")
 
-    nc_tailer = None
-    if os.path.exists(NEXTCLOUD_LOG):
-        nc_tailer = LogTailer(NEXTCLOUD_LOG, os.path.join(STATE_DIR, 'nextcloud.pos'))
-        logging.info(f"Monitoring Nextcloud log: {NEXTCLOUD_LOG}")
-    else:
-        logging.info(f"Nextcloud log not found: {NEXTCLOUD_LOG}, skipping")
+    if not nginx_tailers:
+        logging.info(f"No nginx access logs found in {NGINX_LOG_DIR}")
 
     conn = get_db()
     logging.info("Connected to MySQL")
 
     last_metrics_time = 0
     last_cleanup_time = time.time()
+    last_nginx_discover = time.time()
     prev_net = get_net_bytes()
     cycle = 0
 
@@ -550,22 +483,28 @@ def main():
                 if lines:
                     process_fail2ban(lines)
 
+            if time.time() - last_nginx_discover >= 300:
+                new_logs = discover_nginx_logs()
+                for log_name in new_logs:
+                    if log_name not in nginx_tailers:
+                        log_path = os.path.join(NGINX_LOG_DIR, log_name)
+                        if os.path.exists(log_path):
+                            state_file = os.path.join(STATE_DIR, f'nginx_{log_name}.pos')
+                            nginx_tailers[log_name] = LogTailer(log_path, state_file)
+                            logging.info(f"Discovered new nginx log: {log_name}")
+                last_nginx_discover = time.time()
+
             for log_name, tailer in nginx_tailers.items():
                 lines = tailer.read_new_lines()
                 if lines:
                     process_nginx_access(lines, log_name)
 
-            if nc_tailer:
-                lines = nc_tailer.read_new_lines()
-                if lines:
-                    process_nextcloud_log(lines)
-
-            total_buf = len(ipt_buffer) + len(f2b_buffer) + len(nginx_buffer) + len(ssh_buffer) + len(nc_auth_buffer)
+            total_buf = len(ipt_buffer) + len(f2b_buffer) + len(nginx_buffer) + len(ssh_buffer)
             if total_buf > 0:
                 flushed = flush_to_db(conn)
                 if flushed > 0 and cycle % 10 == 0:
                     logging.info(f"Flushed {flushed} records (ipt={len(ipt_buffer)} f2b={len(f2b_buffer)} "
-                                 f"nginx={len(nginx_buffer)} ssh={len(ssh_buffer)} nc={len(nc_auth_buffer)})")
+                                 f"nginx={len(nginx_buffer)} ssh={len(ssh_buffer)})")
 
             now = time.time()
             if now - last_metrics_time >= METRICS_INTERVAL:
@@ -604,7 +543,7 @@ def main():
     except Exception:
         pass
 
-    logging.info("Stats collector v2 stopped")
+    logging.info("Stats collector v3 stopped")
 
 if __name__ == '__main__':
     main()
